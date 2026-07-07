@@ -26,13 +26,29 @@ create table if not exists products (
   created_at timestamptz not null default now()
 );
 
+-- Tabla del carrusel principal (banner de arriba de la página de inicio)
+create table if not exists hero_slides (
+  id bigint generated always as identity primary key,
+  title text not null,
+  subtitle text default '',
+  image_url text,
+  bg_color text not null default '#5b1049',
+  show_button boolean not null default true,
+  button_text text default 'Ver catálogo',
+  button_url text default 'categorias/',
+  sort_order int not null default 0,
+  created_at timestamptz not null default now()
+);
+
 -- Activar seguridad a nivel de fila (RLS)
 alter table categories enable row level security;
 alter table products enable row level security;
+alter table hero_slides enable row level security;
 
 -- Lectura pública (para que la web principal muestre el catálogo sin login)
 create policy "public read categories" on categories for select using (true);
 create policy "public read products" on products for select using (true);
+create policy "public read hero_slides" on hero_slides for select using (true);
 
 -- Escritura solo para usuarios autenticados (el panel de administración)
 create policy "auth insert categories" on categories for insert with check (auth.role() = 'authenticated');
@@ -42,6 +58,10 @@ create policy "auth delete categories" on categories for delete using (auth.role
 create policy "auth insert products" on products for insert with check (auth.role() = 'authenticated');
 create policy "auth update products" on products for update using (auth.role() = 'authenticated');
 create policy "auth delete products" on products for delete using (auth.role() = 'authenticated');
+
+create policy "auth insert hero_slides" on hero_slides for insert with check (auth.role() = 'authenticated');
+create policy "auth update hero_slides" on hero_slides for update using (auth.role() = 'authenticated');
+create policy "auth delete hero_slides" on hero_slides for delete using (auth.role() = 'authenticated');
 
 -- ============================================================
 -- IMPORTANTE: después de correr este script, crea el bucket de

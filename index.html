@@ -236,7 +236,7 @@ nav.cat-nav{
 .promo-card p{font-size:13px;opacity:.9;}
 
 /* ---------- FOOTER ---------- */
-footer{background:#161616;color:#ccc;padding:44px 0 20px;margin-top:20px;}
+footer{background:var(--black);color:#ccc;padding:44px 0 20px;margin-top:20px;}
 .footer-grid{display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:26px;margin-bottom:30px;}
 .footer-grid h5{color:#fff;font-size:14px;margin-bottom:14px;font-weight:800;}
 .footer-grid p, .footer-grid li{font-size:13px;color:#aaa;margin-bottom:9px;line-height:1.5;}
@@ -566,9 +566,10 @@ async function restGet(table, qs) {
 }
 
 async function loadCatalog() {
-  const [cats, prods] = await Promise.all([
+  const [cats, prods, slides] = await Promise.all([
     restGet("categories", "select=*&order=sort_order.asc"),
     restGet("products", "select=*&order=sort_order.asc"),
+    restGet("hero_slides", "select=*&order=sort_order.asc").catch(() => []),
   ]);
   CATEGORIES = cats;
   catById = Object.fromEntries(CATEGORIES.map(c => [c.id, c]));
@@ -581,6 +582,7 @@ async function loadCatalog() {
     sold: !!p.sold,
     img: p.photo_url || placeholderImage(p.category_id, p.name),
   }));
+  HERO_SLIDES = slides;
 }
 
 /* ---------------- IMAGEN PLACEHOLDER (SVG inline) ---------------- */
@@ -607,12 +609,8 @@ function shade(hex, percent) {
   return "#" + (0x1000000 + r * 0x10000 + g * 0x100 + b).toString(16).slice(1);
 }
 
-/* ---------------- HERO SLIDES ---------------- */
-const HERO_SLIDES = [
-  { title: "Catálogo Pandora Boutique", subtitle: "Velas LED, luces y decoración — por mayor y menor", cta: "Ver catálogo", bg: "linear-gradient(120deg,#ec1e79,#8b0a52)", cat: "all" },
-  { title: "Luces LED para tu espacio", subtitle: "Guirnaldas de bombillas para interior y exterior", cta: "Explorar", bg: "linear-gradient(120deg,#ff6fa5,#7c3aed)", cat: "luces" },
-  { title: "Candelabros y velas LED", subtitle: "Dale un toque especial a tu hogar o evento", cta: "Ver candelabros", bg: "linear-gradient(120deg,#7c3aed,#4c1d95)", cat: "candelabros" },
-];
+/* ---------------- HERO SLIDES (editables desde el CMS) ---------------- */
+let HERO_SLIDES = [];
 
 /* ================= ESTADO ================= */
 const CART_STORAGE_KEY = "pandoraCart";
@@ -818,18 +816,30 @@ function checkoutViaWhatsapp() {
 
 /* ================= HERO CAROUSEL ================= */
 function renderHero() {
+  const heroSection = document.getElementById("hero").closest("section");
+  if (!HERO_SLIDES.length) {
+    if (heroSection) heroSection.style.display = "none";
+    return;
+  }
+  if (heroSection) heroSection.style.display = "";
+
   const track = document.getElementById("heroTrack");
-  track.innerHTML = HERO_SLIDES.map(s => `
-    <div class="hero-slide" style="background:${s.bg}">
+  track.innerHTML = HERO_SLIDES.map(s => {
+    const bg = s.image_url
+      ? `background-image:linear-gradient(rgba(0,0,0,.28),rgba(0,0,0,.28)),url('${s.image_url}');background-size:cover;background-position:center;`
+      : `background:${s.bg_color || "#5b1049"};`;
+    const button = s.show_button && s.button_text
+      ? `<a href="${s.button_url || "categorias/"}" class="btn">${s.button_text}</a>`
+      : "";
+    return `
+    <div class="hero-slide" style="${bg}">
       <div class="slide-content">
-        <h2>${s.title}</h2>
-        <p>${s.subtitle}</p>
-        <a href="#productos" class="btn" data-cat="${s.cat || "all"}">${s.cta}</a>
+        <h2>${s.title || ""}</h2>
+        <p>${s.subtitle || ""}</p>
+        ${button}
       </div>
-    </div>`).join("");
-  track.querySelectorAll(".btn").forEach(b => {
-    b.addEventListener("click", (e) => setCategory(b.dataset.cat));
-  });
+    </div>`;
+  }).join("");
 
   const dots = document.getElementById("heroDots");
   dots.innerHTML = HERO_SLIDES.map((_, i) => `<button data-i="${i}" class="${i === 0 ? "active" : ""}"></button>`).join("");
@@ -837,6 +847,7 @@ function renderHero() {
     d.addEventListener("click", () => goToSlide(Number(d.dataset.i)));
   });
 
+  heroIndex = 0;
   updateHeroPosition();
 }
 function updateHeroPosition() {
@@ -847,10 +858,11 @@ function updateHeroPosition() {
   });
 }
 function goToSlide(i) {
+  if (!HERO_SLIDES.length) return;
   heroIndex = (i + HERO_SLIDES.length) % HERO_SLIDES.length;
   updateHeroPosition();
 }
-let heroTimer = setInterval(() => goToSlide(heroIndex + 1), 5000);
+let heroTimer = setInterval(() => { if (HERO_SLIDES.length) goToSlide(heroIndex + 1); }, 5000);
 
 /* ================= UI: DRAWERS / OVERLAY ================= */
 function openCart() {
