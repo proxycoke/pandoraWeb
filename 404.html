@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Pandora Boutique</title>
+<script>
+(function () {
+  // GitHub Pages es hosting estático: no existe una carpeta real por
+  // cada categoría (se crean/editan desde el CMS). Esta página 404
+  // detecta rutas del tipo /pandoraWeb/categorias/{tipo} y redirige a
+  // categorias/index.html?tipo={tipo}, que restaura la URL "bonita"
+  // mediante history.replaceState antes de mostrar el contenido.
+  var BASE_PATH = "/pandoraWeb/";
+  var path = window.location.pathname;
+  var m = path.match(/\/pandoraWeb\/categorias\/([^\/?#]+)\/?$/);
+  if (m && m[1] && m[1] !== "index.html") {
+    window.location.replace(BASE_PATH + "categorias/index.html?tipo=" + encodeURIComponent(m[1]));
+  } else {
+    window.location.replace(BASE_PATH);
+  }
+})();
+</script>
+</head>
+<body></body>
+</html>
