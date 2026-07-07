@@ -63,7 +63,7 @@ header.main-header{
   box-shadow:var(--shadow);
 }
 .header-row{
-  display:flex;align-items:center;gap:20px;
+  display:flex;align-items:center;justify-content:center;gap:20px;
   padding:14px 20px;
   max-width:1280px;margin:0 auto;
 }
@@ -75,7 +75,7 @@ header.main-header{
   background:var(--teal);color:#fff;width:34px;height:34px;border-radius:9px;
   display:flex;align-items:center;justify-content:center;font-size:18px;
 }
-.search-wrap{flex:1;position:relative;max-width:560px;}
+.search-wrap{width:100%;max-width:420px;position:relative;}
 .search-wrap input{
   width:100%;padding:11px 44px 11px 16px;border-radius:24px;
   border:1px solid var(--border);background:var(--bg);font-size:14px;outline:none;
@@ -227,23 +227,9 @@ nav.cat-nav{
 .promo-card h4{font-size:19px;font-weight:800;margin-bottom:6px;}
 .promo-card p{font-size:13px;opacity:.9;}
 
-/* ---------- NEWSLETTER ---------- */
-.newsletter{
-  background:var(--black);color:#fff;border-radius:var(--radius);padding:34px;text-align:center;
-}
-.newsletter h3{font-size:22px;font-weight:800;margin-bottom:8px;}
-.newsletter p{font-size:13.5px;color:#ccc;margin-bottom:18px;}
-.newsletter form{display:flex;gap:8px;max-width:420px;margin:0 auto;}
-.newsletter input{
-  flex:1;padding:12px 16px;border-radius:24px;border:none;font-size:14px;
-}
-.newsletter button{
-  background:var(--teal);color:#fff;padding:12px 22px;border-radius:24px;font-weight:700;white-space:nowrap;
-}
-
 /* ---------- FOOTER ---------- */
 footer{background:#161616;color:#ccc;padding:44px 0 20px;margin-top:20px;}
-.footer-grid{display:grid;grid-template-columns:2fr 1fr 1fr 1.3fr;gap:26px;margin-bottom:30px;}
+.footer-grid{display:grid;grid-template-columns:1.4fr 1fr;gap:26px;margin-bottom:30px;}
 .footer-grid h5{color:#fff;font-size:14px;margin-bottom:14px;font-weight:800;}
 .footer-grid p, .footer-grid li{font-size:13px;color:#aaa;margin-bottom:9px;line-height:1.5;}
 .footer-grid li a:hover{color:#fff;}
@@ -349,7 +335,6 @@ footer{background:#161616;color:#ccc;padding:44px 0 20px;margin-top:20px;}
   .footer-grid{grid-template-columns:1fr;}
   .section{padding:26px 0;}
   .wa-float{bottom:74px;}
-  .newsletter form{flex-direction:column;}
 }
 </style>
 </head>
@@ -370,7 +355,6 @@ footer{background:#161616;color:#ccc;padding:44px 0 20px;margin-top:20px;}
       <button id="searchBtn">🔍</button>
     </div>
     <div class="header-actions">
-      <a href="#" class="action hide-mobile"><span class="icon">👤</span>Ingresar</a>
       <button class="action" id="btnOpenCart">
         <span class="icon">🛒</span>Carrito
         <span class="cart-count" id="cartCount">0</span>
@@ -434,18 +418,6 @@ footer{background:#161616;color:#ccc;padding:44px 0 20px;margin-top:20px;}
   </div>
 </section>
 
-<!-- NEWSLETTER -->
-<section class="section container">
-  <div class="newsletter">
-    <h3>Suscríbete y entérate de nuestras novedades</h3>
-    <p>Nuevos ingresos, stock limitado y promociones directo a tu correo.</p>
-    <form id="newsletterForm">
-      <input type="email" placeholder="Tu correo electrónico" required>
-      <button type="submit">Suscribirme</button>
-    </form>
-  </div>
-</section>
-
 <!-- FOOTER -->
 <footer>
   <div class="container">
@@ -458,23 +430,6 @@ footer{background:#161616;color:#ccc;padding:44px 0 20px;margin-top:20px;}
           <a href="#" aria-label="Facebook">📘</a>
           <a href="#" aria-label="TikTok">🎵</a>
         </div>
-      </div>
-      <div>
-        <h5>Nosotros</h5>
-        <ul>
-          <li><a href="#">Sobre Pandora Boutique</a></li>
-          <li><a href="#">Venta por mayor</a></li>
-          <li><a href="#">Trabaja con nosotros</a></li>
-        </ul>
-      </div>
-      <div>
-        <h5>Atención al cliente</h5>
-        <ul>
-          <li><a href="#">Política de envíos</a></li>
-          <li><a href="#">Cambios y devoluciones</a></li>
-          <li><a href="#">Términos y condiciones</a></li>
-          <li><a href="#">Libro de reclamaciones</a></li>
-        </ul>
       </div>
       <div>
         <h5>Contacto</h5>
@@ -994,12 +949,6 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("heroPrev").addEventListener("click", () => goToSlide(heroIndex - 1));
   document.getElementById("heroNext").addEventListener("click", () => goToSlide(heroIndex + 1));
 
-  // Newsletter (solo visual, sin backend)
-  document.getElementById("newsletterForm").addEventListener("submit", (e) => {
-    e.preventDefault();
-    alertReplacement("¡Gracias por suscribirte! (demo, sin envío real de correos)");
-    e.target.reset();
-  });
 });
 
 // Evitamos usar window.alert (bloquea la página); mostramos un mensaje simple en consola + UI ligera.
