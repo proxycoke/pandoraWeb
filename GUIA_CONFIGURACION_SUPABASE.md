@@ -110,9 +110,9 @@ Este botón solo aparece **una vez** (mientras la base de datos esté vacía), a
 
 ## Paso 8 — Subir los archivos a tu sitio web (GitHub Pages)
 
-Una vez que todo funcione en tu computadora, sube los 2 archivos actualizados (`index.html` y `cms/index.html`) a tu repositorio de GitHub igual que hiciste antes, para que los cambios se publiquen en `https://proxycoke.github.io/pandoraWeb/`.
+Una vez que todo funcione en tu computadora, sube los 2 archivos actualizados (`index.html` y `cms/index.html`) a tu repositorio de GitHub igual que hiciste antes, para que los cambios se publiquen en `https://proxycoke.github.io/pandoraweb/`.
 
-El CMS (`cms/index.html`) también puede vivir en el mismo repositorio, por ejemplo en la dirección `https://proxycoke.github.io/pandoraWeb/cms/` — así podrás entrar a administrar tu catálogo desde cualquier computador o celular con solo tu correo y contraseña.
+El CMS (`cms/index.html`) también puede vivir en el mismo repositorio, por ejemplo en la dirección `https://proxycoke.github.io/pandoraweb/cms/` — así podrás entrar a administrar tu catálogo desde cualquier computador o celular con solo tu correo y contraseña.
 
 ---
 
