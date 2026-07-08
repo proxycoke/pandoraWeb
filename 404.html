@@ -7,12 +7,16 @@
 (function () {
   // GitHub Pages es hosting estático: no existe una carpeta real por
   // cada categoría (se crean/editan desde el CMS). Esta página 404
-  // detecta rutas del tipo /pandoraweb/categorias/{tipo} y redirige a
+  // detecta rutas del tipo /categorias/{tipo} y redirige a
   // categorias/index.html?tipo={tipo}, que restaura la URL "bonita"
   // mediante history.replaceState antes de mostrar el contenido.
-  var BASE_PATH = "/pandoraweb/";
+  // El sitio se sirve en la raíz del dominio (pandoraimport.com).
+  var BASE_PATH = "/";
   var path = window.location.pathname;
-  var m = path.match(/\/pandoraweb\/categorias\/([^\/?#]+)\/?$/i);
+  // Compatibilidad con links viejos que aún tengan el prefijo /pandoraweb/
+  // (de cuando el sitio vivía en proxycoke.github.io/pandoraweb/).
+  var normalizedPath = path.replace(/^\/pandoraweb(\/|$)/i, "/");
+  var m = normalizedPath.match(/^\/categorias\/([^\/?#]+)\/?$/i);
   if (m && m[1] && m[1] !== "index.html") {
     window.location.replace(BASE_PATH + "categorias/index.html?tipo=" + encodeURIComponent(m[1]));
   } else {
