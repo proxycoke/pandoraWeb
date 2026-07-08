@@ -205,10 +205,15 @@ button:disabled{opacity:.45;cursor:not-allowed;}
       <button class="tab-btn" data-tab="categorias">🗂️ Categorías</button>
       <button class="tab-btn" data-tab="carrusel">🎠 Carrusel</button>
       <button class="tab-btn" data-tab="mantenimiento">🚧 Mantenimiento</button>
+      <button class="tab-btn" data-tab="importacion">📦 Importación masiva</button>
     </div>
 
     <!-- PRODUCTOS -->
     <section id="tab-productos">
+      <div class="toolbar" id="importFilterBanner" style="display:none;background:#fef3c7;border:1px solid #fde68a;border-radius:8px;padding:8px 12px;">
+        <span style="font-size:13px;color:#92400e;">Mostrando solo los productos recién importados.</span>
+        <button class="btn-outline" id="btnClearImportFilter">Quitar filtro</button>
+      </div>
       <div class="toolbar">
         <input type="text" id="searchInput" placeholder="Buscar producto por nombre...">
         <select id="filterCat"><option value="">Todas las categorías</option></select>
@@ -259,6 +264,67 @@ button:disabled{opacity:.45;cursor:not-allowed;}
         <button class="btn-primary" id="btnMaintOff">✅ Desactivar (volver a publicar la web)</button>
         <button class="btn-outline" id="btnMaintSaveMsg">Guardar solo el mensaje</button>
         <p class="hint" id="maintSaveStatus"></p>
+      </div>
+    </section>
+
+    <!-- IMPORTACIÓN MASIVA -->
+    <section id="tab-importacion" style="display:none;">
+      <div class="import-box" style="display:block;">
+        <h4 style="margin-top:0;">Importación masiva de productos</h4>
+        <p class="hint">
+          Sube muchos productos de una sola vez con un archivo de Excel, en vez de crearlos uno por uno. Sigue estos 3 pasos:
+        </p>
+
+        <div class="field-section" style="border-top:none;padding-top:0;margin-top:0;">
+          <h4>1. Descarga la plantilla</h4>
+          <p class="hint">Ábrela en Excel o Google Sheets y agrega una fila por cada producto nuevo. Trae 2 ejemplos ya llenos para que veas el formato exacto, y una hoja de instrucciones.</p>
+          <button class="btn-outline" id="btnDownloadTemplate">⬇️ Descargar plantilla (Excel)</button>
+        </div>
+
+        <div class="field-section">
+          <h4>2. Sube tu archivo ya lleno</h4>
+          <div class="field">
+            <label>Archivo Excel (.xlsx)</label>
+            <input type="file" id="importExcelFile" accept=".xlsx,.xls">
+          </div>
+          <div class="field">
+            <label>Carpeta con las fotos de estos productos (opcional, pero recomendado)</label>
+            <input type="file" id="importPhotosFolder" webkitdirectory directory multiple>
+            <p class="hint">Selecciona la carpeta completa donde tienes guardadas las fotos nuevas. El sistema busca cada foto por su nombre de archivo, tal como lo escribiste en el Excel.</p>
+          </div>
+          <button class="btn-primary" id="btnAnalyzeImport">Analizar archivo</button>
+          <p class="hint" id="importAnalyzeError" style="color:#b91c1c;"></p>
+        </div>
+
+        <div id="importPreviewWrap" style="display:none;">
+          <div class="field-section">
+            <h4>3. Revisa y confirma</h4>
+            <p class="hint" id="importSummary"></p>
+            <div style="max-height:340px;overflow:auto;border:1px solid var(--border);border-radius:10px;">
+              <table class="product-table" id="importPreviewTable">
+                <thead>
+                  <tr><th>Fila</th><th>Categoría</th><th>Nombre</th><th>Precio</th><th>Foto</th><th>Estado</th></tr>
+                </thead>
+                <tbody id="importPreviewBody"></tbody>
+              </table>
+            </div>
+            <button class="btn-primary" id="btnConfirmImport" disabled>Confirmar e importar</button>
+            <div id="importProgressWrap" style="display:none;margin-top:12px;">
+              <div style="background:var(--border);border-radius:8px;height:10px;overflow:hidden;">
+                <div id="importProgressBar" style="background:var(--pink);height:100%;width:0%;transition:width .2s;"></div>
+              </div>
+              <p class="hint" id="importProgressText"></p>
+            </div>
+          </div>
+        </div>
+
+        <div id="importResultWrap" style="display:none;">
+          <div class="field-section">
+            <p id="importResultText" style="font-weight:700;"></p>
+            <button class="btn-outline" id="btnViewImported">Ver estos productos</button>
+            <button class="btn-danger" id="btnUndoImport">Deshacer esta importación</button>
+          </div>
+        </div>
       </div>
     </section>
   </div>
@@ -425,6 +491,9 @@ button:disabled{opacity:.45;cursor:not-allowed;}
   </div>
 </div>
 
+<!-- Librería para leer/generar archivos Excel (.xlsx) directamente en el navegador, usada por la Importación masiva -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
 <script>
 /* ---------------- CONEXIÓN A LA BASE DE DATOS (Supabase) ---------------- */
 /* Pega aquí la URL y la llave "anon public" de tu proyecto de Supabase.
@@ -438,6 +507,7 @@ const PHOTOS_BUCKET = "product-photos";
 let categories = [];       // {id, name, icon, color, sort_order}
 let products = [];         // {id, name, category_id, price, wholesale, sold, photo_url}
 let slides = [];           // {id, title, subtitle, image_url, bg_color, show_button, button_text, button_url, sort_order}
+let importFilterIds = null; // si no es null, la tabla de Productos solo muestra estos ids (recién importados)
 let accessToken = null;
 let refreshToken = null;
 let sessionExpiresAt = 0;  // epoch ms en que vence el access_token
@@ -774,6 +844,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     document.getElementById('tab-categorias').style.display = btn.dataset.tab === 'categorias' ? 'block' : 'none';
     document.getElementById('tab-carrusel').style.display = btn.dataset.tab === 'carrusel' ? 'block' : 'none';
     document.getElementById('tab-mantenimiento').style.display = btn.dataset.tab === 'mantenimiento' ? 'block' : 'none';
+    document.getElementById('tab-importacion').style.display = btn.dataset.tab === 'importacion' ? 'block' : 'none';
     localStorage.setItem(ACTIVE_TAB_KEY, btn.dataset.tab);
   });
 });
@@ -827,6 +898,299 @@ document.getElementById('btnMaintOn').addEventListener('click', () => {
 });
 document.getElementById('btnMaintOff').addEventListener('click', () => saveMaintenance(false));
 document.getElementById('btnMaintSaveMsg').addEventListener('click', () => saveMaintenance(siteSettings.maintenance_enabled));
+
+/* ======================= IMPORTACIÓN MASIVA DE PRODUCTOS ======================= */
+const IMPORT_HEADERS = {
+  categoria: 'Categoría',
+  nombre: 'Nombre',
+  precio: 'Precio',
+  mayorTexto: 'Precio por mayor (texto)',
+  agotado: 'Agotado (Sí/No)',
+  descripcion: 'Descripción',
+  especificaciones: 'Especificaciones',
+  niveles: 'Niveles por mayor',
+  fotoPrincipal: 'Foto principal (archivo)',
+  fotosAdicionales: 'Fotos adicionales (archivos)',
+};
+
+function normalizeText(s){
+  return String(s == null ? '' : s).trim().toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '');
+}
+
+function matchCategoryByName(name){
+  const target = normalizeText(name);
+  if (!target) return null;
+  const found = categories.find(c => normalizeText(c.name) === target || normalizeText(c.id) === target);
+  return found ? found.id : null;
+}
+
+function parsePairsList(text){
+  // "Material: Metal dorado; Altura: 28 cm" -> [{label:'Material', value:'Metal dorado'}, ...]
+  return String(text || '').split(';').map(chunk => chunk.trim()).filter(Boolean).map(chunk => {
+    const idx = chunk.indexOf(':');
+    if (idx === -1) return { label: chunk, value: '' };
+    return { label: chunk.slice(0, idx).trim(), value: chunk.slice(idx + 1).trim() };
+  });
+}
+
+function parseTiersList(text){
+  return parsePairsList(text).map(p => ({ label: p.label, price: Number(String(p.value).replace(',', '.')) || 0 }));
+}
+
+function parseFilenamesList(text){
+  return String(text || '').split(';').map(s => s.trim()).filter(Boolean);
+}
+
+function parseYesNo(text){
+  const t = normalizeText(text);
+  return t === 'si' || t === 'sí' || t === 'true' || t === '1' || t === 'x';
+}
+
+let importPhotoFiles = {};   // nombre de archivo en minúsculas -> File
+let importAnalyzedRows = []; // filas ya validadas, listas para previsualizar/crear
+let importedProductIds = []; // ids creados en la última importación (para "ver"/"deshacer")
+
+function downloadImportTemplate(){
+  const headers = Object.values(IMPORT_HEADERS);
+  const example1 = [
+    'Candelabros', 'Candelabro de metal dorado 3 velas', 45, '6x S/38 · Ciento S/3300', 'No',
+    'Candelabro decorativo de metal con acabado dorado, diseñado para sostener 3 velas.',
+    'Material: Metal con acabado dorado; Altura aproximada: 28 cm; Color: Dorado',
+    '1 - 5 unidades: 45; 6 - 11 unidades: 38; 12+ unidades (por cajón): 33',
+    'candelabro-dorado-1.jpg', 'candelabro-dorado-2.jpg; candelabro-dorado-3.jpg',
+  ];
+  const example2 = [
+    'Velas LED pequeñas', 'Vela LED pequeña blanca', 8.5, '', 'No', '', '', '', 'vela-blanca.jpg', '',
+  ];
+  const emptyRow = headers.map(() => '');
+  const rows = [headers, example1, example2, emptyRow, emptyRow, emptyRow];
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols'] = headers.map(h => ({ wch: Math.max(18, h.length + 2) }));
+
+  const instrucciones = [
+    ['Cómo llenar la plantilla de productos'],
+    [''],
+    ['Columna', 'Qué escribir'],
+    ['Categoría', 'El nombre exacto de una categoría que ya exista en la pestaña "Categorías" del CMS (ej: Candelabros).'],
+    ['Nombre', 'Nombre del producto tal como se mostrará a los clientes.'],
+    ['Precio', 'Precio de venta normal, solo el número (ej: 45 o 45.50).'],
+    ['Precio por mayor (texto)', 'Texto libre corto que se muestra como aviso, igual que hoy (ej: "6x S/38 · Ciento S/3300"). Opcional.'],
+    ['Agotado (Sí/No)', 'Escribe "Sí" si el producto está agotado, o déjalo vacío / "No" si está disponible.'],
+    ['Descripción', 'Texto libre para la ficha del producto. Opcional.'],
+    ['Especificaciones', 'Lista de "Etiqueta: Valor" separadas por punto y coma. Ej: "Material: Metal; Color: Dorado; Altura: 28 cm". Opcional.'],
+    ['Niveles por mayor', 'Lista de "Rango: Precio" separadas por punto y coma. Ej: "1 - 5 unidades: 45; 6 - 11 unidades: 38". Opcional.'],
+    ['Foto principal (archivo)', 'El nombre EXACTO del archivo de la foto principal (ej: candelabro-dorado-1.jpg), igual a como se llama en la carpeta de fotos que vas a seleccionar en el CMS. Opcional: si lo dejas vacío, el producto queda con una imagen de relleno.'],
+    ['Fotos adicionales (archivos)', 'Nombres de archivo de fotos extra para la galería del producto, separados por punto y coma. Opcional.'],
+    [''],
+    ['Importante:'],
+    ['- No cambies los nombres de las columnas (la primera fila).'],
+    ['- Puedes borrar las filas de ejemplo antes de subir el archivo, o dejarlas: el CMS te muestra una vista previa antes de crear nada, así que puedes revisar y cancelar si algo está mal.'],
+    ['- Al subir este archivo en el CMS, también selecciona la carpeta donde tienes guardadas todas las fotos mencionadas arriba.'],
+  ];
+  const wsInfo = XLSX.utils.aoa_to_sheet(instrucciones);
+  wsInfo['!cols'] = [{ wch: 26 }, { wch: 95 }];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Productos');
+  XLSX.utils.book_append_sheet(wb, wsInfo, 'Instrucciones');
+  XLSX.writeFile(wb, 'plantilla_productos_pandora.xlsx');
+}
+document.getElementById('btnDownloadTemplate').addEventListener('click', downloadImportTemplate);
+
+document.getElementById('importPhotosFolder').addEventListener('change', (e) => {
+  importPhotoFiles = {};
+  Array.from(e.target.files).forEach(file => {
+    importPhotoFiles[file.name.toLowerCase()] = file;
+  });
+});
+
+async function analyzeImportFile(){
+  const errEl = document.getElementById('importAnalyzeError');
+  errEl.textContent = '';
+  const fileInput = document.getElementById('importExcelFile');
+  const file = fileInput.files[0];
+  if (!file) { errEl.textContent = 'Selecciona primero tu archivo Excel.'; return; }
+
+  let rows;
+  try {
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, { type: 'array' });
+    const sheetName = wb.SheetNames.find(n => normalizeText(n) === 'productos') || wb.SheetNames[0];
+    const sheet = wb.Sheets[sheetName];
+    rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+  } catch (err) {
+    errEl.textContent = 'No se pudo leer el archivo. Asegúrate de que sea un Excel (.xlsx) válido.';
+    return;
+  }
+
+  importAnalyzedRows = rows.map((row, idx) => {
+    const rawCat = row[IMPORT_HEADERS.categoria];
+    const rawName = row[IMPORT_HEADERS.nombre];
+    const rawPrice = row[IMPORT_HEADERS.precio];
+    const isBlankRow = !String(rawCat || '').trim() && !String(rawName || '').trim() && !String(rawPrice || '').trim();
+    if (isBlankRow) return null; // fila vacía (ej. sobrante de la plantilla) -> se ignora sin avisar
+
+    const warnings = [];
+    const errors = [];
+
+    const category_id = matchCategoryByName(rawCat);
+    if (!category_id) errors.push(`Categoría "${rawCat}" no existe`);
+
+    const name = String(rawName || '').trim();
+    if (!name) errors.push('Falta el nombre');
+
+    const price = Number(String(rawPrice).replace(',', '.'));
+    if (!rawPrice || isNaN(price) || price < 0) errors.push('Precio inválido o vacío');
+
+    const mainPhotoName = String(row[IMPORT_HEADERS.fotoPrincipal] || '').trim();
+    let mainPhotoFile = null;
+    if (mainPhotoName) {
+      mainPhotoFile = importPhotoFiles[mainPhotoName.toLowerCase()] || null;
+      if (!mainPhotoFile) warnings.push(`Foto "${mainPhotoName}" no encontrada en la carpeta seleccionada`);
+    }
+    const galleryNames = parseFilenamesList(row[IMPORT_HEADERS.fotosAdicionales]);
+    const galleryFiles = [];
+    galleryNames.forEach(n => {
+      const f = importPhotoFiles[n.toLowerCase()];
+      if (f) galleryFiles.push(f);
+      else warnings.push(`Foto de galería "${n}" no encontrada`);
+    });
+
+    return {
+      rowNum: idx + 2, // +2 porque la fila 1 del Excel es el encabezado
+      category_id, categoryLabel: rawCat,
+      name, price,
+      wholesale: String(row[IMPORT_HEADERS.mayorTexto] || '').trim(),
+      sold: parseYesNo(row[IMPORT_HEADERS.agotado]),
+      description: String(row[IMPORT_HEADERS.descripcion] || '').trim(),
+      specifications: parsePairsList(row[IMPORT_HEADERS.especificaciones]),
+      wholesale_tiers: parseTiersList(row[IMPORT_HEADERS.niveles]),
+      mainPhotoName, mainPhotoFile, galleryNames, galleryFiles,
+      errors, warnings,
+    };
+  }).filter(Boolean);
+
+  renderImportPreview();
+}
+document.getElementById('btnAnalyzeImport').addEventListener('click', analyzeImportFile);
+
+function renderImportPreview(){
+  const body = document.getElementById('importPreviewBody');
+  const totalErrors = importAnalyzedRows.filter(r => r.errors.length).length;
+  const totalWarnings = importAnalyzedRows.filter(r => !r.errors.length && r.warnings.length).length;
+  const totalOk = importAnalyzedRows.length - totalErrors - totalWarnings;
+
+  body.innerHTML = importAnalyzedRows.map(r => {
+    let statusHtml;
+    if (r.errors.length) statusHtml = `<span class="sold-badge" title="${escapeHtml(r.errors.join(' · '))}">❌ ${escapeHtml(r.errors.join(', '))}</span>`;
+    else if (r.warnings.length) statusHtml = `<span class="status-pill danger" title="${escapeHtml(r.warnings.join(' · '))}">⚠️ ${escapeHtml(r.warnings.join(', '))}</span>`;
+    else statusHtml = `<span class="status-pill">✅ Listo</span>`;
+    return `<tr>
+      <td>${r.rowNum}</td>
+      <td>${escapeHtml(r.categoryLabel)}</td>
+      <td>${escapeHtml(r.name)}</td>
+      <td>${isNaN(r.price) ? '—' : 'S/ ' + r.price.toFixed(2)}</td>
+      <td style="font-size:12px;color:var(--gray);">${escapeHtml(r.mainPhotoName || '—')}</td>
+      <td style="font-size:12px;">${statusHtml}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('importSummary').textContent =
+    `${importAnalyzedRows.length} filas encontradas — ${totalOk} listas, ${totalWarnings} con advertencias (se pueden subir igual), ${totalErrors} con errores (no se subirán).`;
+
+  document.getElementById('importPreviewWrap').style.display = importAnalyzedRows.length ? 'block' : 'none';
+  document.getElementById('btnConfirmImport').disabled = importAnalyzedRows.length === 0 || importAnalyzedRows.every(r => r.errors.length);
+  document.getElementById('importResultWrap').style.display = 'none';
+}
+
+async function runImport(){
+  const validRows = importAnalyzedRows.filter(r => !r.errors.length);
+  if (!validRows.length) return;
+  if (!confirm(`¿Crear ${validRows.length} productos nuevos?`)) return;
+
+  document.getElementById('btnConfirmImport').disabled = true;
+  const progressWrap = document.getElementById('importProgressWrap');
+  const progressBar = document.getElementById('importProgressBar');
+  const progressText = document.getElementById('importProgressText');
+  progressWrap.style.display = 'block';
+
+  const totalSteps = validRows.length; // 1 paso por producto (incluye subir sus fotos)
+  let done = 0;
+  const setProgress = (label) => {
+    progressBar.style.width = Math.round((done / totalSteps) * 100) + '%';
+    progressText.textContent = label;
+  };
+  setProgress(`Subiendo fotos y preparando productos... 0/${totalSteps}`);
+
+  const builtRows = [];
+  let baseSortOrder = products.length;
+
+  for (const r of validRows) {
+    let photo_url = '';
+    let gallery_photos = [];
+    try {
+      if (r.mainPhotoFile) {
+        const blob = await resizeImageFile(r.mainPhotoFile);
+        photo_url = await uploadPhoto(blob, 'jpg');
+      }
+      for (const f of r.galleryFiles) {
+        const blob = await resizeImageFile(f);
+        gallery_photos.push(await uploadPhoto(blob, 'jpg'));
+      }
+    } catch (err) {
+      console.error('Error subiendo fotos de', r.name, err);
+    }
+    builtRows.push({
+      name: r.name, category_id: r.category_id, price: r.price, wholesale: r.wholesale, sold: r.sold,
+      sort_order: baseSortOrder++, photo_url, description: r.description,
+      specifications: r.specifications, wholesale_tiers: r.wholesale_tiers, gallery_photos,
+    });
+    done++;
+    setProgress(`Subiendo fotos y preparando productos... ${done}/${totalSteps}`);
+  }
+
+  // Insertar en lotes para no saturar la conexión de una sola vez
+  importedProductIds = [];
+  const BATCH = 20;
+  try {
+    for (let i = 0; i < builtRows.length; i += BATCH) {
+      const chunk = builtRows.slice(i, i + BATCH);
+      const created = await restRequest('POST', 'products', { body: chunk, prefer: 'return=representation' });
+      if (Array.isArray(created)) importedProductIds.push(...created.map(p => p.id));
+      progressText.textContent = `Creando productos en la base de datos... ${Math.min(i + BATCH, builtRows.length)}/${builtRows.length}`;
+    }
+  } catch (err) {
+    alert('Ocurrió un error creando los productos: ' + err.message + '\nLos productos ya creados antes del error se mantienen (no se pierden).');
+  }
+
+  progressWrap.style.display = 'none';
+  await loadAll();
+
+  const skipped = importAnalyzedRows.length - validRows.length;
+  document.getElementById('importResultWrap').style.display = 'block';
+  document.getElementById('importResultText').textContent =
+    `✅ Se crearon ${importedProductIds.length} productos.` + (skipped ? ` (${skipped} filas con errores no se subieron.)` : '');
+}
+document.getElementById('btnConfirmImport').addEventListener('click', runImport);
+
+document.getElementById('btnViewImported').addEventListener('click', () => {
+  importFilterIds = importedProductIds.slice();
+  document.querySelector('.tab-btn[data-tab="productos"]').click();
+  renderProducts();
+});
+
+document.getElementById('btnUndoImport').addEventListener('click', async () => {
+  if (!importedProductIds.length) return;
+  if (!confirm(`¿Eliminar los ${importedProductIds.length} productos que acabas de importar? Esta acción no se puede deshacer.`)) return;
+  for (const id of importedProductIds) {
+    try { await restRequest('DELETE', 'products', { query: `?id=eq.${id}` }); } catch (err) { console.error(err); }
+  }
+  importedProductIds = [];
+  document.getElementById('importResultWrap').style.display = 'none';
+  await loadAll();
+  alert('Importación deshecha.');
+});
 
 function renderSlides(){
   const grid = document.getElementById('slidesGrid');
@@ -890,10 +1254,12 @@ function renderProducts(){
   const filterCat = document.getElementById('filterCat').value;
   const body = document.getElementById('productsBody');
   let list = products.filter(p => {
+    if (importFilterIds && !importFilterIds.includes(p.id)) return false;
     if (filterCat && p.category_id !== filterCat) return false;
     if (search && !p.name.toLowerCase().includes(search)) return false;
     return true;
   });
+  document.getElementById('importFilterBanner').style.display = importFilterIds ? 'flex' : 'none';
   document.getElementById('productsEmpty').style.display = list.length ? 'none' : 'block';
   body.innerHTML = list.map(p => {
     const cat = categories.find(c => c.id === p.category_id);
@@ -915,6 +1281,10 @@ function renderProducts(){
 
 document.getElementById('searchInput').addEventListener('input', renderProducts);
 document.getElementById('filterCat').addEventListener('change', renderProducts);
+document.getElementById('btnClearImportFilter').addEventListener('click', () => {
+  importFilterIds = null;
+  renderProducts();
+});
 
 /* ======================= MODAL PRODUCTO ======================= */
 const productOverlay = document.getElementById('productOverlay');
