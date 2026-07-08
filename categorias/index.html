@@ -30,7 +30,13 @@ body{
   background:var(--bg);
   color:var(--black);
   -webkit-tap-highlight-color:transparent;
+  display:flex;
+  flex-direction:column;
+  min-height:100vh;
 }
+/* Empuja el footer al fondo de la pantalla cuando el contenido es corto
+   (ej: "categoría no encontrada"), en vez de dejar una franja vacía debajo. */
+.page-body{flex:1 0 auto;display:flex;flex-direction:column;}
 img{max-width:100%;display:block;}
 a{text-decoration:none;color:inherit;}
 button{font-family:inherit;cursor:pointer;border:none;background:none;}
@@ -387,6 +393,20 @@ footer{background:var(--black);color:#ccc;padding:44px 0 20px;margin-top:20px;}
   .cat-card-full .cat-icon-full{width:52px;height:52px;font-size:24px;}
 }
 
+/* ---------- BLOQUE "NO ENCONTRADO" (categoría o producto inválido en la URL) ---------- */
+.not-found-block{
+  grid-column:1/-1;text-align:center;padding:70px 20px 90px;
+  display:flex;flex-direction:column;align-items:center;
+}
+.not-found-block .nf-emoji{font-size:46px;margin-bottom:16px;}
+.not-found-block h2{font-size:clamp(24px,4vw,38px);font-weight:800;color:var(--black);margin-bottom:12px;}
+.not-found-block p{color:var(--gray);font-size:14.5px;line-height:1.7;max-width:420px;}
+.not-found-block a{color:var(--teal);font-weight:700;}
+.not-found-block a:hover{text-decoration:underline;}
+@media (max-width:680px){
+  .not-found-block{padding:50px 16px 60px;}
+}
+
 /* ---------- PÁGINA DE PRODUCTO INDIVIDUAL ---------- */
 .breadcrumb{font-size:12.5px;color:var(--gray);padding:0 0 6px;margin-top:18px;}
 .breadcrumb a{color:var(--teal-dark);font-weight:600;}
@@ -464,6 +484,7 @@ footer{background:var(--black);color:#ccc;padding:44px 0 20px;margin-top:20px;}
 </head>
 <body>
 
+<div class="page-body">
 <!-- TOP BAR -->
 <div class="topbar">
   <div class="topbar-line1">✨ <strong>VENTAS POR MAYOR Y MENOR A NIVEL NACIONAL</strong></div>
@@ -524,6 +545,8 @@ footer{background:var(--black);color:#ccc;padding:44px 0 20px;margin-top:20px;}
     <div id="productDetailWrap"></div>
   </div>
 </section>
+</div>
+<!-- /page-body -->
 
 <!-- FOOTER -->
 <footer>
@@ -796,11 +819,17 @@ function renderDetail(slug) {
   document.getElementById("viewDetail").style.display = "";
 
   if (!cat) {
-    document.getElementById("detailTitle").textContent = "Categoría no encontrada";
+    document.getElementById("detailTitle").textContent = "";
     document.getElementById("detailSub").textContent = "";
-    document.getElementById("detailProductGrid").innerHTML =
-      `<p style="grid-column:1/-1;text-align:center;color:var(--gray);padding:30px 0;">No encontramos esa categoría. <a href="./" style="color:var(--teal);font-weight:700;">Ver todas las categorías</a></p>`;
+    document.getElementById("detailProductGrid").innerHTML = `
+      <div class="not-found-block">
+        <div class="nf-emoji">🔍</div>
+        <h2>Oops! Esta categoría no existe.</h2>
+        <p>Puede que el enlace esté mal escrito o ya no esté disponible.<br>
+        <a href="./" id="catNotFoundLink">Ver todas las categorías →</a></p>
+      </div>`;
     document.title = "Categoría no encontrada | Pandora Boutique";
+    document.getElementById("catNotFoundLink").addEventListener("click", goToGridView);
     return;
   }
 
@@ -861,7 +890,13 @@ function renderProductDetail(catSlug, productParam) {
 
   if (!p) {
     document.title = "Producto no encontrado | Pandora Boutique";
-    wrap.innerHTML = `<p style="text-align:center;color:var(--gray);padding:60px 0;">No encontramos ese producto. <a href="./" id="pdBackLink" style="color:var(--teal);font-weight:700;">Ver todas las categorías</a></p>`;
+    wrap.innerHTML = `
+      <div class="not-found-block">
+        <div class="nf-emoji">🔍</div>
+        <h2>Oops! Este producto no existe.</h2>
+        <p>Puede que el enlace esté mal escrito o ya no esté disponible.<br>
+        <a href="./" id="pdBackLink">Ver todas las categorías →</a></p>
+      </div>`;
     document.getElementById("pdBackLink").addEventListener("click", goToGridView);
     return;
   }
