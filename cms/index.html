@@ -357,11 +357,136 @@ let categories = [];       // {id, name, icon, color, sort_order}
 let products = [];         // {id, name, category_id, price, wholesale, sold, photo_url}
 let slides = [];           // {id, title, subtitle, image_url, bg_color, show_button, button_text, button_url, sort_order}
 let accessToken = null;
+let refreshToken = null;
+let sessionExpiresAt = 0;  // epoch ms en que vence el access_token
+let lastActivityAt = 0;    // epoch ms de la última acción del usuario
 let editingProductId = null;   // null = creando nuevo
 let editingCatId = null;       // null = creando nueva
 let editingSlideId = null;     // null = creando nueva
 let pendingPhoto = null;       // { blob, ext } elegido en el modal (antes de guardar) | 'REMOVE' | null
 let pendingSlidePhoto = null;  // { blob, ext } elegido en el modal del carrusel | 'REMOVE' | null
+
+/* ======================= SESIÓN (persistencia entre recargas + cierre por inactividad) ======================= */
+const SESSION_KEY = 'pb_cms_session';
+const ACTIVITY_KEY = 'pb_cms_last_activity';
+const ACTIVE_TAB_KEY = 'pb_cms_active_tab';
+const INACTIVITY_LIMIT_MS = 30 * 60 * 1000; // 30 minutos
+
+function saveSession(access_token, refresh_token, expires_in){
+  accessToken = access_token;
+  refreshToken = refresh_token;
+  sessionExpiresAt = Date.now() + (Number(expires_in) || 3600) * 1000;
+  localStorage.setItem(SESSION_KEY, JSON.stringify({
+    access_token: accessToken, refresh_token: refreshToken, expires_at: sessionExpiresAt,
+  }));
+  markActivity();
+}
+
+function clearSession(){
+  accessToken = null;
+  refreshToken = null;
+  sessionExpiresAt = 0;
+  localStorage.removeItem(SESSION_KEY);
+  localStorage.removeItem(ACTIVITY_KEY);
+}
+
+let _lastActivityWriteAt = 0;
+function markActivity(){
+  const now = Date.now();
+  lastActivityAt = now;
+  // No escribimos a localStorage en cada evento (mousemove dispara muchísimas veces);
+  // basta con guardar cada pocos segundos para no perder más de eso si cierran la pestaña.
+  if (now - _lastActivityWriteAt > 5000) {
+    _lastActivityWriteAt = now;
+    localStorage.setItem(ACTIVITY_KEY, String(now));
+  }
+}
+
+function showApp(){
+  document.getElementById('loginBox').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  document.getElementById('topActions').style.display = 'flex';
+}
+function showLogin(message){
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('topActions').style.display = 'none';
+  document.getElementById('loginBox').style.display = 'block';
+  document.getElementById('loginPassword').value = '';
+  document.getElementById('loginError').textContent = message || '';
+}
+function forceLogout(message){
+  clearSession();
+  showLogin(message);
+}
+
+async function authRefresh(refresh_token){
+  const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
+    method: 'POST',
+    headers: { apikey: SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ refresh_token }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error_description || data.msg || 'No se pudo renovar la sesión.');
+  return data;
+}
+
+// Se llama al principio de cada operación contra Supabase: si el access_token está por vencer
+// (o ya venció), lo renueva en silencio con el refresh_token antes de continuar.
+async function ensureFreshToken(){
+  if (!accessToken) return;
+  if (Date.now() < sessionExpiresAt - 10000) return;
+  try {
+    const data = await authRefresh(refreshToken);
+    saveSession(data.access_token, data.refresh_token, data.expires_in);
+  } catch (err) {
+    forceLogout('Tu sesión expiró. Vuelve a iniciar sesión.');
+    throw new Error('Sesión expirada.');
+  }
+}
+
+// Restaura la sesión guardada al cargar/recargar la página. Devuelve true si el usuario
+// sigue "logueado" (dentro de la ventana de 30 min de inactividad y con token válido o renovable).
+async function restoreSession(){
+  const raw = localStorage.getItem(SESSION_KEY);
+  if (!raw) return false;
+
+  const storedActivity = parseInt(localStorage.getItem(ACTIVITY_KEY) || '0', 10);
+  if (!storedActivity || (Date.now() - storedActivity) > INACTIVITY_LIMIT_MS) {
+    clearSession();
+    return false;
+  }
+  lastActivityAt = storedActivity;
+
+  let session;
+  try { session = JSON.parse(raw); } catch (e) { clearSession(); return false; }
+  accessToken = session.access_token;
+  refreshToken = session.refresh_token;
+  sessionExpiresAt = session.expires_at || 0;
+
+  if (Date.now() >= sessionExpiresAt - 10000) {
+    try {
+      const data = await authRefresh(refreshToken);
+      saveSession(data.access_token, data.refresh_token, data.expires_in);
+    } catch (err) {
+      clearSession();
+      return false;
+    }
+  }
+  return true;
+}
+
+// Registra actividad del usuario (clics, teclas, mouse, scroll, toques) mientras está logueado.
+['click', 'keydown', 'mousemove', 'scroll', 'touchstart'].forEach(evt => {
+  document.addEventListener(evt, () => { if (accessToken) markActivity(); }, { passive: true });
+});
+
+// Revisa periódicamente si pasaron 30 min sin actividad y, de ser así, cierra la sesión.
+setInterval(() => {
+  if (!accessToken) return;
+  if (Date.now() - lastActivityAt > INACTIVITY_LIMIT_MS) {
+    forceLogout('Tu sesión se cerró por 30 minutos de inactividad. Vuelve a iniciar sesión.');
+  }
+}, 15000);
 
 /* ======================= UTILIDADES ======================= */
 function escapeHtml(s){
@@ -397,6 +522,7 @@ function placeholderImage(catId, text){
 
 /* ======================= LLAMADAS A SUPABASE (REST plano) ======================= */
 async function restRequest(method, table, { query = '', body = null, prefer = null } = {}){
+  await ensureFreshToken();
   const headers = {
     apikey: SUPABASE_ANON_KEY,
     Authorization: `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
@@ -408,6 +534,7 @@ async function restRequest(method, table, { query = '', body = null, prefer = nu
   });
   const text = await res.text();
   if (!res.ok) {
+    if (res.status === 401 && accessToken) forceLogout('Tu sesión expiró. Vuelve a iniciar sesión.');
     let msg = 'Error de servidor';
     try { const j = JSON.parse(text); msg = j.message || j.error_description || msg; } catch(e){}
     throw new Error(msg);
@@ -424,10 +551,11 @@ async function authLogin(email, password){
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error_description || data.msg || 'Correo o contraseña incorrectos.');
-  return data.access_token;
+  return data; // { access_token, refresh_token, expires_in, ... }
 }
 
 async function uploadPhoto(blob, ext, folder){
+  await ensureFreshToken();
   const path = `${folder || 'products'}/${Date.now()}-${Math.random().toString(36).slice(2,8)}.${ext}`;
   const res = await fetch(`${SUPABASE_URL}/storage/v1/object/${PHOTOS_BUCKET}/${path}`, {
     method: 'POST',
@@ -439,6 +567,7 @@ async function uploadPhoto(blob, ext, folder){
     body: blob,
   });
   if (!res.ok) {
+    if (res.status === 401 && accessToken) forceLogout('Tu sesión expiró. Vuelve a iniciar sesión.');
     let msg = 'No se pudo subir la foto.';
     try { const j = await res.json(); msg = j.message || msg; } catch(e){}
     throw new Error(msg);
@@ -498,11 +627,10 @@ async function doLogin(){
   const btn = document.getElementById('btnLogin');
   btn.disabled = true; btn.textContent = 'Ingresando...';
   try {
-    accessToken = await authLogin(email, password);
+    const data = await authLogin(email, password);
+    saveSession(data.access_token, data.refresh_token, data.expires_in);
     localStorage.setItem('pb_cms_email', email);
-    document.getElementById('loginBox').style.display = 'none';
-    document.getElementById('app').style.display = 'block';
-    document.getElementById('topActions').style.display = 'flex';
+    showApp();
     await loadAll();
   } catch (err) {
     errEl.textContent = err.message;
@@ -512,12 +640,27 @@ async function doLogin(){
 }
 
 document.getElementById('btnLogout').addEventListener('click', () => {
-  accessToken = null;
-  document.getElementById('app').style.display = 'none';
-  document.getElementById('topActions').style.display = 'none';
-  document.getElementById('loginBox').style.display = 'block';
-  document.getElementById('loginPassword').value = '';
+  forceLogout();
 });
+
+// Si ya había una sesión guardada (por ejemplo, el usuario recargó la página o le dio F5),
+// la restauramos en vez de mandarlo de nuevo a la pantalla de login — y lo dejamos en la
+// misma pestaña (Productos/Categorías/Carrusel) en la que estaba.
+(async function initSession(){
+  const loggedIn = await restoreSession();
+  if (!loggedIn) return;
+  showApp();
+  const savedTab = localStorage.getItem(ACTIVE_TAB_KEY);
+  if (savedTab) {
+    const tabBtn = document.querySelector(`.tab-btn[data-tab="${savedTab}"]`);
+    if (tabBtn) tabBtn.click();
+  }
+  try {
+    await loadAll();
+  } catch (err) {
+    console.error('Error cargando datos al restaurar sesión:', err);
+  }
+})();
 
 /* ======================= CARGA DE DATOS ======================= */
 async function loadAll(){
@@ -541,6 +684,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     document.getElementById('tab-productos').style.display = btn.dataset.tab === 'productos' ? 'block' : 'none';
     document.getElementById('tab-categorias').style.display = btn.dataset.tab === 'categorias' ? 'block' : 'none';
     document.getElementById('tab-carrusel').style.display = btn.dataset.tab === 'carrusel' ? 'block' : 'none';
+    localStorage.setItem(ACTIVE_TAB_KEY, btn.dataset.tab);
   });
 });
 
