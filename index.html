@@ -585,6 +585,16 @@ async function loadCatalog() {
   HERO_SLIDES = slides;
 }
 
+function escapeHtml(s){
+  return String(s == null ? "" : s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+function slugify(name) {
+  return String(name).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9]+/g, "-").replace(/(^-+|-+$)/g, "") || "producto";
+}
+function productSlug(p) { return slugify(p.name) + "-" + p.id; }
+function productUrl(p) { return "categorias/" + p.catId + "/" + productSlug(p); }
+
 /* ---------------- IMAGEN PLACEHOLDER (SVG inline) ---------------- */
 function placeholderImage(catId, text) {
   const c = catById[catId] || { color: "#999", icon: "🛍️" };
@@ -708,18 +718,18 @@ function renderProducts() {
   grid.innerHTML = list.map(p => {
     const cat = catById[p.catId];
     return `
-    <div class="product-card">
+    <div class="product-card" data-id="${p.id}" style="cursor:pointer;">
       <div class="product-img-wrap">
-        <img src="${p.img}" alt="${p.name}">
+        <img src="${p.img}" alt="${escapeHtml(p.name)}">
         ${p.sold ? `<div class="badge-sold">Agotado</div>` : ""}
       </div>
       <div class="product-info">
         <span class="product-cat">${cat.name}</span>
-        <span class="product-name">${p.name}</span>
+        <span class="product-name">${escapeHtml(p.name)}</span>
         <div class="price-row">
           <span class="price-new">S/ ${p.price.toFixed(2)}</span>
         </div>
-        ${p.wholesale ? `<span class="price-wholesale">🛍️ Por mayor: ${p.wholesale}</span>` : ""}
+        ${p.wholesale ? `<span class="price-wholesale">🛍️ Por mayor: ${escapeHtml(p.wholesale)}</span>` : ""}
         <button class="add-btn" data-id="${p.id}" ${p.sold ? "disabled" : ""}>
           ${p.sold ? "No disponible" : "🛒 Añadir al carrito"}
         </button>
@@ -727,8 +737,15 @@ function renderProducts() {
     </div>`;
   }).join("");
 
+  grid.querySelectorAll(".product-card").forEach(card => {
+    card.addEventListener("click", (e) => {
+      if (e.target.closest(".add-btn")) return;
+      const p = PRODUCTS.find(x => x.id === Number(card.dataset.id));
+      if (p) window.location.href = productUrl(p);
+    });
+  });
   grid.querySelectorAll(".add-btn:not(:disabled)").forEach(btn => {
-    btn.addEventListener("click", () => addToCart(Number(btn.dataset.id)));
+    btn.addEventListener("click", (e) => { e.stopPropagation(); addToCart(Number(btn.dataset.id)); });
   });
 }
 

@@ -6,21 +6,28 @@
 <script>
 (function () {
   // GitHub Pages es hosting estático: no existe una carpeta real por
-  // cada categoría (se crean/editan desde el CMS). Esta página 404
-  // detecta rutas del tipo /categorias/{tipo} y redirige a
-  // categorias/index.html?tipo={tipo}, que restaura la URL "bonita"
-  // mediante history.replaceState antes de mostrar el contenido.
-  // El sitio se sirve en la raíz del dominio (pandoraimport.com).
+  // cada categoría ni por cada producto (se crean/editan desde el CMS).
+  // Esta página 404 detecta rutas del tipo /categorias/{tipo} (o
+  // /categorias/{tipo}/{producto} para la ficha de un producto) y
+  // redirige a categorias/index.html?tipo=...&producto=..., que restaura
+  // la URL "bonita" mediante history.replaceState antes de mostrar el
+  // contenido. El sitio se sirve en la raíz del dominio (pandoraimport.com).
   var BASE_PATH = "/";
   var path = window.location.pathname;
   // Compatibilidad con links viejos que aún tengan el prefijo /pandoraweb/
   // (de cuando el sitio vivía en proxycoke.github.io/pandoraweb/).
   var normalizedPath = path.replace(/^\/pandoraweb(\/|$)/i, "/");
-  var m = normalizedPath.match(/^\/categorias\/([^\/?#]+)\/?$/i);
-  if (m && m[1] && m[1] !== "index.html") {
-    window.location.replace(BASE_PATH + "categorias/index.html?tipo=" + encodeURIComponent(m[1]));
+  // Primero probamos con 2 segmentos: /categorias/{tipo}/{producto}
+  var m2 = normalizedPath.match(/^\/categorias\/([^\/?#]+)\/([^\/?#]+)\/?$/i);
+  if (m2 && m2[1] && m2[1] !== "index.html") {
+    window.location.replace(BASE_PATH + "categorias/index.html?tipo=" + encodeURIComponent(m2[1]) + "&producto=" + encodeURIComponent(m2[2]));
   } else {
-    window.location.replace(BASE_PATH);
+    var m = normalizedPath.match(/^\/categorias\/([^\/?#]+)\/?$/i);
+    if (m && m[1] && m[1] !== "index.html") {
+      window.location.replace(BASE_PATH + "categorias/index.html?tipo=" + encodeURIComponent(m[1]));
+    } else {
+      window.location.replace(BASE_PATH);
+    }
   }
 })();
 </script>

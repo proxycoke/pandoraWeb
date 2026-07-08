@@ -111,6 +111,30 @@ button:disabled{opacity:.45;cursor:not-allowed;}
   background:#fff;border-radius:16px;max-width:520px;width:100%;max-height:88vh;overflow-y:auto;
   padding:24px;box-shadow:var(--shadow-lg);
 }
+.modal.modal-wide{max-width:640px;}
+.field-section{border-top:1px solid var(--border);margin-top:18px;padding-top:16px;}
+.field-section h4{font-size:13.5px;color:var(--black);margin:0 0 4px;}
+.field-section .hint{margin-top:0;margin-bottom:10px;}
+.dyn-row{display:flex;gap:8px;align-items:center;margin-bottom:8px;}
+.dyn-row input[type=text],.dyn-row input[type=number]{
+  padding:9px 10px;border-radius:8px;border:1px solid var(--border);font-size:13.5px;font-family:inherit;
+}
+.dyn-row .dyn-label{flex:1;min-width:0;}
+.dyn-row .dyn-value{flex:1;min-width:0;}
+.price-input-wrap{display:flex;align-items:center;gap:6px;flex:0 0 130px;}
+.price-input-wrap span{font-weight:700;color:var(--gray);font-size:13.5px;}
+.price-input-wrap input{width:100%;}
+.dyn-remove{
+  width:30px;height:30px;flex-shrink:0;border-radius:8px;background:#fee2e2;color:#b91c1c;font-weight:800;
+  display:flex;align-items:center;justify-content:center;padding:0;font-size:15px;
+}
+.dyn-add-btn{margin-top:2px;font-size:13px;font-weight:700;color:var(--pink-dark);background:none;padding:6px 0;}
+.dyn-add-btn:hover{text-decoration:underline;}
+.gallery-list{display:flex;flex-direction:column;gap:8px;margin-bottom:8px;}
+.gallery-item{display:flex;align-items:center;gap:12px;}
+.gallery-item img{width:56px;height:56px;border-radius:8px;object-fit:cover;background:#f3f3f3;flex-shrink:0;}
+.gallery-item .g-info{flex:1;font-size:12.5px;color:var(--gray);}
+.gallery-item input[type=file]{font-size:12px;max-width:220px;}
 .modal h3{margin-top:0;color:var(--pink-dark);}
 .field{margin-bottom:14px;}
 .field label{display:block;font-size:12.5px;font-weight:700;margin-bottom:5px;color:var(--gray);}
@@ -218,7 +242,7 @@ button:disabled{opacity:.45;cursor:not-allowed;}
 
 <!-- MODAL PRODUCTO -->
 <div class="overlay" id="productOverlay">
-  <div class="modal">
+  <div class="modal modal-wide">
     <h3 id="productModalTitle">Nuevo producto</h3>
     <div class="field">
       <label>Nombre del producto</label>
@@ -235,11 +259,11 @@ button:disabled{opacity:.45;cursor:not-allowed;}
       </div>
     </div>
     <div class="field">
-      <label>Precio por mayor / detalle (opcional)</label>
+      <label>Precio por mayor (resumen corto, se muestra como etiqueta en la tarjeta del producto)</label>
       <input type="text" id="pWholesale" placeholder="Ej: 6x S/17 · Doc. S/32 · Ciento S/200">
     </div>
     <div class="field">
-      <label>Foto del producto</label>
+      <label>Foto principal</label>
       <div class="photo-picker">
         <img id="pPhotoPreview" class="photo-preview" src="" alt="">
         <div>
@@ -253,6 +277,40 @@ button:disabled{opacity:.45;cursor:not-allowed;}
       <input type="checkbox" id="pSold">
       <label for="pSold" style="margin:0;">Marcar como agotado</label>
     </div>
+
+    <!-- FOTOS ADICIONALES (galería de la página del producto) -->
+    <div class="field-section">
+      <h4>🖼️ Fotos adicionales (galería)</h4>
+      <p class="hint">Se muestran en la página individual del producto, junto con la foto principal. Recomendado: al menos 3 fotos en total.</p>
+      <div class="gallery-list" id="galleryList"></div>
+      <button class="dyn-add-btn" id="btnAddGalleryPhoto" type="button">+ Agregar foto</button>
+    </div>
+
+    <!-- DESCRIPCIÓN -->
+    <div class="field-section">
+      <h4>📝 Descripción</h4>
+      <p class="hint">Texto detallado del producto, se muestra en la pestaña "Descripción" de su página.</p>
+      <div class="field" style="margin-bottom:0;">
+        <textarea id="pDescription" rows="4" placeholder="Ej: Candelabro decorativo de metal con acabado dorado, diseñado para sostener 3 velas..."></textarea>
+      </div>
+    </div>
+
+    <!-- ESPECIFICACIONES -->
+    <div class="field-section">
+      <h4>📋 Especificaciones</h4>
+      <p class="hint">Agrega las filas que necesites (material, medidas, color, etc). Se muestran en la pestaña "Especificaciones".</p>
+      <div id="specsList"></div>
+      <button class="dyn-add-btn" id="btnAddSpec" type="button">+ Agregar especificación</button>
+    </div>
+
+    <!-- PRECIO POR MAYOR (tabla detallada) -->
+    <div class="field-section">
+      <h4>🛍️ Precio por mayor (tabla para la página del producto)</h4>
+      <p class="hint">Agrega las líneas que necesites. Escribe la cantidad (ej: "6 - 11 unidades") y el precio — el "S/" ya viene fijo, solo escribe el número.</p>
+      <div id="wholesaleTiersList"></div>
+      <button class="dyn-add-btn" id="btnAddWholesaleTier" type="button">+ Agregar línea</button>
+    </div>
+
     <p class="hint" id="productError" style="color:#b91c1c;"></p>
     <div class="modal-actions">
       <button class="btn-outline" id="btnCancelProduct">Cancelar</button>
@@ -365,6 +423,9 @@ let editingCatId = null;       // null = creando nueva
 let editingSlideId = null;     // null = creando nueva
 let pendingPhoto = null;       // { blob, ext } elegido en el modal (antes de guardar) | 'REMOVE' | null
 let pendingSlidePhoto = null;  // { blob, ext } elegido en el modal del carrusel | 'REMOVE' | null
+let specsRows = [];            // [{label, value}] especificaciones del producto en edición
+let wholesaleRows = [];        // [{label, price}] líneas de precio por mayor del producto en edición
+let galleryRows = [];          // [{url, blob, previewUrl}] fotos adicionales del producto en edición
 
 /* ======================= SESIÓN (persistencia entre recargas + cierre por inactividad) ======================= */
 const SESSION_KEY = 'pb_cms_session';
@@ -802,6 +863,10 @@ function openProductModal(id){
     document.getElementById('pWholesale').value = '';
     document.getElementById('pSold').checked = false;
     document.getElementById('pPhotoPreview').src = placeholderImage(categories[0] ? categories[0].id : '', '');
+    document.getElementById('pDescription').value = '';
+    specsRows = [];
+    wholesaleRows = [];
+    galleryRows = [];
   } else {
     const p = products.find(x => x.id === id);
     document.getElementById('productModalTitle').textContent = 'Editar producto';
@@ -811,9 +876,101 @@ function openProductModal(id){
     document.getElementById('pWholesale').value = p.wholesale;
     document.getElementById('pSold').checked = p.sold;
     document.getElementById('pPhotoPreview').src = p.photo_url || placeholderImage(p.category_id, p.name);
+    document.getElementById('pDescription').value = p.description || '';
+    specsRows = Array.isArray(p.specifications) ? p.specifications.map(s => ({ label: s.label || '', value: s.value || '' })) : [];
+    wholesaleRows = Array.isArray(p.wholesale_tiers) ? p.wholesale_tiers.map(t => ({ label: t.label || '', price: (t.price == null ? '' : t.price) })) : [];
+    galleryRows = Array.isArray(p.gallery_photos) ? p.gallery_photos.map(u => ({ url: u, blob: null, previewUrl: null })) : [];
   }
+  renderSpecsList();
+  renderWholesaleTiersList();
+  renderGalleryList();
   productOverlay.classList.add('open');
 }
+
+/* ---- Especificaciones (filas dinámicas: nombre + valor) ---- */
+function renderSpecsList(){
+  const wrap = document.getElementById('specsList');
+  wrap.innerHTML = specsRows.map((r, i) => `
+    <div class="dyn-row" data-idx="${i}">
+      <input type="text" class="dyn-label" data-field="label" placeholder="Ej: Material" value="${escapeHtml(r.label)}">
+      <input type="text" class="dyn-value" data-field="value" placeholder="Ej: Metal con acabado dorado" value="${escapeHtml(r.value)}">
+      <button type="button" class="dyn-remove" data-remove="${i}" title="Quitar">✕</button>
+    </div>`).join('');
+  wrap.querySelectorAll('input').forEach(inp => {
+    inp.addEventListener('input', () => {
+      const idx = Number(inp.closest('.dyn-row').dataset.idx);
+      specsRows[idx][inp.dataset.field] = inp.value;
+    });
+  });
+  wrap.querySelectorAll('[data-remove]').forEach(btn => {
+    btn.addEventListener('click', () => { specsRows.splice(Number(btn.dataset.remove), 1); renderSpecsList(); });
+  });
+}
+document.getElementById('btnAddSpec').addEventListener('click', () => {
+  specsRows.push({ label: '', value: '' });
+  renderSpecsList();
+});
+
+/* ---- Precio por mayor (filas dinámicas: cantidad + precio con "S/" fijo) ---- */
+function renderWholesaleTiersList(){
+  const wrap = document.getElementById('wholesaleTiersList');
+  wrap.innerHTML = wholesaleRows.map((r, i) => `
+    <div class="dyn-row" data-idx="${i}">
+      <input type="text" class="dyn-label" data-field="label" placeholder="Ej: 6 - 11 unidades" value="${escapeHtml(r.label)}">
+      <div class="price-input-wrap"><span>S/</span><input type="number" step="0.01" min="0" class="dyn-value" data-field="price" placeholder="0.00" value="${escapeHtml(r.price)}"></div>
+      <button type="button" class="dyn-remove" data-remove="${i}" title="Quitar">✕</button>
+    </div>`).join('');
+  wrap.querySelectorAll('input').forEach(inp => {
+    inp.addEventListener('input', () => {
+      const idx = Number(inp.closest('.dyn-row').dataset.idx);
+      wholesaleRows[idx][inp.dataset.field] = inp.value;
+    });
+  });
+  wrap.querySelectorAll('[data-remove]').forEach(btn => {
+    btn.addEventListener('click', () => { wholesaleRows.splice(Number(btn.dataset.remove), 1); renderWholesaleTiersList(); });
+  });
+}
+document.getElementById('btnAddWholesaleTier').addEventListener('click', () => {
+  wholesaleRows.push({ label: '', price: '' });
+  renderWholesaleTiersList();
+});
+
+/* ---- Fotos adicionales (galería) ---- */
+function renderGalleryList(){
+  const wrap = document.getElementById('galleryList');
+  wrap.innerHTML = galleryRows.map((r, i) => {
+    const src = r.previewUrl || r.url || '';
+    return `
+    <div class="gallery-item" data-idx="${i}">
+      ${src ? `<img src="${src}" alt="">` : `<div style="width:56px;height:56px;border-radius:8px;background:#f3f3f3;flex-shrink:0;"></div>`}
+      <input type="file" accept="image/*" data-idx="${i}">
+      <span class="g-info">Foto ${i + 1}</span>
+      <button type="button" class="dyn-remove" data-remove="${i}" title="Quitar">✕</button>
+    </div>`;
+  }).join('');
+  wrap.querySelectorAll('input[type=file]').forEach(inp => {
+    inp.addEventListener('change', async e => {
+      const idx = Number(inp.dataset.idx);
+      const file = e.target.files[0];
+      if (!file) return;
+      try {
+        const blob = await resizeImageFile(file);
+        galleryRows[idx].blob = blob;
+        galleryRows[idx].previewUrl = URL.createObjectURL(blob);
+        renderGalleryList();
+      } catch (err) {
+        document.getElementById('productError').textContent = 'No se pudo procesar una de las fotos adicionales.';
+      }
+    });
+  });
+  wrap.querySelectorAll('[data-remove]').forEach(btn => {
+    btn.addEventListener('click', () => { galleryRows.splice(Number(btn.dataset.remove), 1); renderGalleryList(); });
+  });
+}
+document.getElementById('btnAddGalleryPhoto').addEventListener('click', () => {
+  galleryRows.push({ url: null, blob: null, previewUrl: null });
+  renderGalleryList();
+});
 function closeProductModal(){ productOverlay.classList.remove('open'); }
 document.getElementById('btnNewProduct').addEventListener('click', () => openProductModal(null));
 document.getElementById('btnCancelProduct').addEventListener('click', closeProductModal);
@@ -845,11 +1002,35 @@ document.getElementById('btnSaveProduct').addEventListener('click', async () => 
   const errEl = document.getElementById('productError');
   const saveBtn = document.getElementById('btnSaveProduct');
 
+  const description = document.getElementById('pDescription').value.trim();
+
   if (!name) { errEl.textContent = 'Escribe el nombre del producto.'; return; }
   if (!cat) { errEl.textContent = 'Elige una categoría (crea una primero si no hay ninguna).'; return; }
   if (isNaN(price) || price < 0) { errEl.textContent = 'Escribe un precio válido.'; return; }
   const dup = products.find(p => p.name.toLowerCase() === name.toLowerCase() && p.id !== editingProductId);
   if (dup) { errEl.textContent = 'Ya existe un producto con ese nombre exacto. Usa un nombre distinto.'; return; }
+
+  // Especificaciones: se ignoran las filas totalmente vacías; si falta un lado, se pide completarla.
+  const specifications = [];
+  for (const r of specsRows) {
+    const label = (r.label || '').trim();
+    const value = (r.value || '').trim();
+    if (!label && !value) continue;
+    if (!label || !value) { errEl.textContent = 'Completa el nombre y el valor en cada especificación (o quita la línea vacía).'; return; }
+    specifications.push({ label, value });
+  }
+
+  // Precio por mayor: el "S/" queda fijo, solo se guarda el número que escribe el administrador.
+  const wholesale_tiers = [];
+  for (const r of wholesaleRows) {
+    const label = (r.label || '').trim();
+    const hasPrice = r.price !== '' && r.price != null;
+    if (!label && !hasPrice) continue;
+    if (!label || !hasPrice) { errEl.textContent = 'Completa la cantidad y el precio en cada línea de "Precio por mayor" (o quita la línea vacía).'; return; }
+    const priceNum = parseFloat(r.price);
+    if (isNaN(priceNum) || priceNum < 0) { errEl.textContent = 'Escribe un precio válido en "Precio por mayor".'; return; }
+    wholesale_tiers.push({ label, price: priceNum });
+  }
 
   errEl.textContent = '';
   saveBtn.disabled = true; saveBtn.textContent = 'Guardando...';
@@ -858,12 +1039,19 @@ document.getElementById('btnSaveProduct').addEventListener('click', async () => 
     if (pendingPhoto === 'REMOVE') photo_url = null;
     else if (pendingPhoto && pendingPhoto.blob) photo_url = await uploadPhoto(pendingPhoto.blob, pendingPhoto.ext);
 
+    // Fotos adicionales: sube las nuevas (elegidas en esta sesión) y conserva las que ya estaban subidas.
+    const gallery_photos = [];
+    for (const r of galleryRows) {
+      if (r.blob) gallery_photos.push(await uploadPhoto(r.blob, 'jpg'));
+      else if (r.url) gallery_photos.push(r.url);
+    }
+
     if (editingProductId == null) {
-      const row = { name, category_id: cat, price, wholesale, sold, sort_order: products.length };
+      const row = { name, category_id: cat, price, wholesale, sold, sort_order: products.length, description, specifications, wholesale_tiers, gallery_photos };
       if (photo_url) row.photo_url = photo_url;
       await restRequest('POST', 'products', { body: row, prefer: 'return=representation' });
     } else {
-      const row = { name, category_id: cat, price, wholesale, sold };
+      const row = { name, category_id: cat, price, wholesale, sold, description, specifications, wholesale_tiers, gallery_photos };
       if (photo_url !== undefined) row.photo_url = photo_url;
       await restRequest('PATCH', 'products', { query: `?id=eq.${editingProductId}`, body: row, prefer: 'return=representation' });
     }

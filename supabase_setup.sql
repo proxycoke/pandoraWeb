@@ -23,7 +23,12 @@ create table if not exists products (
   sold boolean not null default false,
   photo_url text,
   sort_order int not null default 0,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  -- Campos para la ficha/página individual de cada producto:
+  description text not null default '',
+  specifications jsonb not null default '[]'::jsonb,   -- [{label, value}, ...]
+  wholesale_tiers jsonb not null default '[]'::jsonb,   -- [{label, price}, ...] tabla de precio por mayor
+  gallery_photos jsonb not null default '[]'::jsonb     -- ["url1","url2", ...] fotos adicionales (además de photo_url)
 );
 
 -- Tabla del carrusel principal (banner de arriba de la página de inicio)
