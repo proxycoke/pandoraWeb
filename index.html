@@ -485,7 +485,7 @@ footer{background:var(--black);color:#ccc;padding:44px 0 20px;margin-top:20px;}
         </div>
       </div>
     </div>
-    <div class="footer-bottom">© <span id="year"></span> Pandora Boutique. Todos los derechos reservados. — Sitio de demostración.</div>
+    <div class="footer-bottom">© <span id="year"></span> Pandora Boutique. Todos los derechos reservados. — Desarrollado por Ronn V.</div>
   </div>
 </footer>
 
@@ -918,6 +918,15 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("searchInput").addEventListener("keydown", (e) => { if (e.key === "Enter") doSearch(e.target.value); });
   document.getElementById("searchBtnMobile").addEventListener("click", () => doSearch(document.getElementById("searchInputMobile").value));
   document.getElementById("searchInputMobile").addEventListener("keydown", (e) => { if (e.key === "Enter") doSearch(e.target.value); });
+
+  // Si llegamos desde otra página con un término de búsqueda en la URL (?buscar=...), lo aplicamos
+  const buscarParam = new URLSearchParams(window.location.search).get("buscar");
+  if (buscarParam) {
+    document.getElementById("searchInput").value = buscarParam;
+    document.getElementById("searchInputMobile").value = buscarParam;
+    doSearch(buscarParam);
+    history.replaceState(null, "", window.location.pathname);
+  }
 
   // Carrito
   document.getElementById("btnOpenCart").addEventListener("click", openCart);

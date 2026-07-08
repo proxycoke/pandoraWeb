@@ -302,6 +302,7 @@ button:disabled{opacity:.45;cursor:not-allowed;}
       <input type="file" id="sPhotoFile" accept="image/*">
       <button class="btn-outline" id="btnRemoveSlidePhoto" style="margin-top:6px;">Quitar foto</button>
       <p class="hint">Si no subes una foto, se usará el color de fondo que elijas abajo.</p>
+      <p class="hint">📐 Medida recomendada: <strong>1600 x 600 px</strong> (imagen horizontal, tipo banner ancho). Si subes una foto de otra medida no hay problema — se recorta automáticamente para llenar el espacio — pero para que se vea completa y nítida, usa una imagen horizontal de esa medida aproximada y con lo más importante centrado.</p>
     </div>
     <div class="field">
       <label>Color de fondo (si no hay foto)</label>
@@ -859,7 +860,7 @@ document.getElementById('btnNewSlide').addEventListener('click', () => openSlide
 document.getElementById('sPhotoFile').addEventListener('change', e => {
   const file = e.target.files[0];
   if (!file) return;
-  resizeImageFile(file).then(blob => {
+  resizeImageFile(file, 1600, 0.78).then(blob => {
     pendingSlidePhoto = { blob, ext: 'jpg' };
     document.getElementById('sPhotoPreview').src = URL.createObjectURL(blob);
     document.getElementById('sPhotoPreview').style.background = 'transparent';
