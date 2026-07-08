@@ -507,10 +507,35 @@ footer{background:var(--black);color:#ccc;padding:44px 0 20px;margin-top:20px;}
   .thumb-col{flex-direction:row;width:100%;overflow-x:auto;}
   .thumb{width:64px;flex-shrink:0;}
 }
+/* ---------- PANTALLA DE MANTENIMIENTO ---------- */
+.maintenance-screen{
+  display:none;
+  position:fixed;inset:0;z-index:99999;
+  flex-direction:column;align-items:center;justify-content:center;
+  text-align:center;padding:24px;
+  background:linear-gradient(135deg,var(--black),var(--teal-dark));
+  overflow:hidden;
+}
+.maintenance-screen.show{display:flex;}
+.maint-decor{position:absolute;border-radius:50%;background:rgba(255,255,255,.08);}
+.maint-decor-1{width:340px;height:340px;top:-120px;right:-100px;}
+.maint-decor-2{width:260px;height:260px;bottom:-100px;left:-80px;background:rgba(255,255,255,.06);}
+.maint-logo{width:min(320px,70vw);height:auto;margin-bottom:28px;position:relative;}
+.maint-message{color:#fff;font-size:clamp(18px,2.6vw,26px);font-weight:800;max-width:640px;line-height:1.4;position:relative;}
+.maint-sub{color:rgba(255,255,255,.85);font-size:14px;margin-top:14px;font-weight:700;letter-spacing:.02em;position:relative;}
 
 </style>
 </head>
 <body>
+
+<!-- PANTALLA DE MANTENIMIENTO: se muestra/oculta desde JS según site_settings.maintenance_enabled -->
+<div id="maintenanceScreen" class="maintenance-screen">
+  <div class="maint-decor maint-decor-1"></div>
+  <div class="maint-decor maint-decor-2"></div>
+  <img src="../assets/img/logo.png" alt="Pandora Boutique" class="maint-logo">
+  <p class="maint-message" id="maintMessage">Nos encontramos en mantenimiento. ¡Estamos volviendo a la brevedad!</p>
+  <p class="maint-sub">pandoraimport.com</p>
+</div>
 
 <div class="page-body">
 <!-- TOP BAR -->
@@ -700,6 +725,29 @@ async function loadCatalog() {
     wholesaleTiers: Array.isArray(p.wholesale_tiers) ? p.wholesale_tiers : [],
     gallery: Array.isArray(p.gallery_photos) ? p.gallery_photos : [],
   }));
+}
+
+/* ---------------- MODO MANTENIMIENTO ----------------
+   Consulta site_settings antes de cargar cualquier otra cosa. Si está
+   activado, muestra la pantalla de mantenimiento y NO carga el catálogo,
+   el carrito, ni el ruteo — así el usuario no puede hacer nada más. */
+async function checkMaintenanceMode() {
+  try {
+    const rows = await restGet("site_settings", "select=maintenance_enabled,maintenance_message&id=eq.1");
+    const row = rows && rows[0];
+    if (row && row.maintenance_enabled) {
+      const msgEl = document.getElementById("maintMessage");
+      if (msgEl && row.maintenance_message) msgEl.textContent = row.maintenance_message;
+      document.getElementById("maintenanceScreen").classList.add("show");
+      document.documentElement.style.overflow = "hidden";
+      return true;
+    }
+  } catch (err) {
+    // Si no se puede verificar (ej. sin internet), mostramos la web normal
+    // en vez de dejar a los clientes bloqueados por un error de red.
+    console.error("No se pudo verificar el modo mantenimiento:", err);
+  }
+  return false;
 }
 
 function escapeHtml(s){
@@ -1286,6 +1334,9 @@ function closeMobileCatPanel() {
 
 /* ================= INIT ================= */
 document.addEventListener("DOMContentLoaded", async () => {
+  const enMantenimiento = await checkMaintenanceMode();
+  if (enMantenimiento) return;
+
   document.getElementById("year").textContent = new Date().getFullYear();
 
   const waLink = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent("¡Hola Pandora Boutique! Quisiera más información sobre sus productos.")}`;

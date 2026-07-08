@@ -153,6 +153,7 @@ button:disabled{opacity:.45;cursor:not-allowed;}
 .modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px;}
 .hint{font-size:12px;color:var(--gray);margin-top:4px;}
 .status-pill{font-size:12px;background:#dcfce7;color:#166534;padding:5px 12px;border-radius:20px;font-weight:700;}
+.status-pill.danger{background:#fee2e2;color:#b91c1c;}
 .empty-msg{text-align:center;color:var(--gray);padding:40px 0;}
 .import-box{
   max-width:640px;margin:0 auto 24px;padding:20px 24px;background:#fff;border-radius:var(--radius);
@@ -203,6 +204,7 @@ button:disabled{opacity:.45;cursor:not-allowed;}
       <button class="tab-btn active" data-tab="productos">🛍️ Productos</button>
       <button class="tab-btn" data-tab="categorias">🗂️ Categorías</button>
       <button class="tab-btn" data-tab="carrusel">🎠 Carrusel</button>
+      <button class="tab-btn" data-tab="mantenimiento">🚧 Mantenimiento</button>
     </div>
 
     <!-- PRODUCTOS -->
@@ -237,6 +239,27 @@ button:disabled{opacity:.45;cursor:not-allowed;}
       </div>
       <div class="cat-grid" id="slidesGrid"></div>
       <div class="empty-msg" id="slidesEmpty" style="display:none;">Aún no tienes diapositivas en el carrusel.</div>
+    </section>
+
+    <!-- MANTENIMIENTO -->
+    <section id="tab-mantenimiento" style="display:none;">
+      <div class="import-box" style="display:block;">
+        <h4 style="margin-top:0;">Modo mantenimiento</h4>
+        <p class="hint">
+          Actívalo cuando necesites hacer cambios en la web y no quieras que los clientes la usen mientras tanto.
+          Verán una pantalla con tu logo y el mensaje de abajo en vez de la tienda — no podrán navegar, buscar productos
+          ni usar el carrito hasta que lo desactives aquí.
+        </p>
+        <p style="margin:14px 0;"><span class="status-pill" id="maintStatusPill">Cargando…</span></p>
+        <div class="field">
+          <label>Mensaje que verán los clientes</label>
+          <textarea id="maintMessageInput" rows="3" placeholder="Nos encontramos en mantenimiento. ¡Estamos volviendo a la brevedad!"></textarea>
+        </div>
+        <button class="btn-danger" id="btnMaintOn">🚧 Activar mantenimiento</button>
+        <button class="btn-primary" id="btnMaintOff">✅ Desactivar (volver a publicar la web)</button>
+        <button class="btn-outline" id="btnMaintSaveMsg">Guardar solo el mensaje</button>
+        <p class="hint" id="maintSaveStatus"></p>
+      </div>
     </section>
   </div>
 </div>
@@ -725,15 +748,19 @@ document.getElementById('btnLogout').addEventListener('click', () => {
 })();
 
 /* ======================= CARGA DE DATOS ======================= */
+let siteSettings = { maintenance_enabled: false, maintenance_message: '' };
+
 async function loadAll(){
-  const [cats, prods, slds] = await Promise.all([
+  const [cats, prods, slds, settingsRows] = await Promise.all([
     restRequest('GET', 'categories', { query: '?select=*&order=sort_order.asc' }),
     restRequest('GET', 'products', { query: '?select=*&order=sort_order.asc' }),
     restRequest('GET', 'hero_slides', { query: '?select=*&order=sort_order.asc' }).catch(() => []),
+    restRequest('GET', 'site_settings', { query: '?select=*&id=eq.1' }).catch(() => []),
   ]);
   categories = cats;
   products = prods;
   slides = slds;
+  if (settingsRows && settingsRows[0]) siteSettings = settingsRows[0];
   document.getElementById('importBox').style.display = (categories.length === 0 && products.length === 0) ? 'block' : 'none';
   renderAll();
 }
@@ -746,6 +773,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     document.getElementById('tab-productos').style.display = btn.dataset.tab === 'productos' ? 'block' : 'none';
     document.getElementById('tab-categorias').style.display = btn.dataset.tab === 'categorias' ? 'block' : 'none';
     document.getElementById('tab-carrusel').style.display = btn.dataset.tab === 'carrusel' ? 'block' : 'none';
+    document.getElementById('tab-mantenimiento').style.display = btn.dataset.tab === 'mantenimiento' ? 'block' : 'none';
     localStorage.setItem(ACTIVE_TAB_KEY, btn.dataset.tab);
   });
 });
@@ -756,8 +784,49 @@ function renderAll(){
   renderCategories();
   renderProducts();
   renderSlides();
+  renderMaintenance();
   document.getElementById('statusPill').textContent = `${products.length} productos · ${categories.length} categorías · ${slides.length} diapositivas`;
 }
+
+/* ======================= MODO MANTENIMIENTO ======================= */
+function renderMaintenance(){
+  const on = !!siteSettings.maintenance_enabled;
+  const pill = document.getElementById('maintStatusPill');
+  pill.textContent = on ? '🚧 La web está EN MANTENIMIENTO' : '✅ La web está publicada normalmente';
+  pill.classList.toggle('danger', on);
+  document.getElementById('maintMessageInput').value =
+    siteSettings.maintenance_message || 'Nos encontramos en mantenimiento. ¡Estamos volviendo a la brevedad!';
+  document.getElementById('btnMaintOn').style.display = on ? 'none' : '';
+  document.getElementById('btnMaintOff').style.display = on ? '' : 'none';
+}
+
+async function saveMaintenance(enabled){
+  const statusEl = document.getElementById('maintSaveStatus');
+  const message = document.getElementById('maintMessageInput').value.trim() ||
+    'Nos encontramos en mantenimiento. ¡Estamos volviendo a la brevedad!';
+  statusEl.textContent = 'Guardando...';
+  try {
+    await restRequest('PATCH', 'site_settings', {
+      query: '?id=eq.1',
+      body: { maintenance_enabled: enabled, maintenance_message: message, updated_at: new Date().toISOString() },
+    });
+    siteSettings = { ...siteSettings, maintenance_enabled: enabled, maintenance_message: message };
+    renderMaintenance();
+    statusEl.textContent = enabled
+      ? 'Listo — tus clientes ahora ven la pantalla de mantenimiento.'
+      : 'Listo — la web volvió a estar disponible para tus clientes.';
+  } catch (err) {
+    statusEl.textContent = 'No se pudo guardar: ' + err.message;
+  }
+}
+
+document.getElementById('btnMaintOn').addEventListener('click', () => {
+  if (confirm('¿Activar el modo mantenimiento? Tus clientes no podrán ver ni usar la web hasta que lo desactives.')) {
+    saveMaintenance(true);
+  }
+});
+document.getElementById('btnMaintOff').addEventListener('click', () => saveMaintenance(false));
+document.getElementById('btnMaintSaveMsg').addEventListener('click', () => saveMaintenance(siteSettings.maintenance_enabled));
 
 function renderSlides(){
   const grid = document.getElementById('slidesGrid');
