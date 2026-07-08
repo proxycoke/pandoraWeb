@@ -1,0 +1,20 @@
+name: Mantener despierta la base de datos (Supabase)
+
+# Este workflow no hace nada visible en tu web: solo le hace una consulta muy
+# liviana a la base de datos de Supabase una vez al día para que el plan
+# gratuito nunca la marque como "inactiva" y la pause. Es gratis, automático,
+# y no necesitas tocar nada después de subir este archivo una sola vez.
+"on":
+  schedule:
+    - cron: '0 9 * * *'   # todos los días a las 9:00 UTC (madrugada en Perú)
+  workflow_dispatch: {}    # también puedes ejecutarlo manualmente desde la pestaña "Actions" de GitHub
+
+jobs:
+  ping-supabase:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Consultar la base de datos (mantiene el proyecto activo)
+        run: |
+          curl -s -o /dev/null -w "Respuesta de Supabase: %{http_code}\n" \
+            -H "apikey: sb_publishable_TywPnO-iX4NKcJuUXBO6jQ_xorjibTI" \
+            "https://uukwnfydriezpswnabln.supabase.co/rest/v1/categories?select=id&limit=1"
