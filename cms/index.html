@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
 <title>Gestor de contenido — Pandora Boutique</title>
+<link rel="icon" type="image/x-icon" href="../assets/img/favicon.ico">
+<link rel="icon" type="image/png" sizes="16x16" href="../assets/img/favicon-16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="../assets/img/favicon-32.png">
+<link rel="apple-touch-icon" sizes="180x180" href="../assets/img/apple-touch-icon.png">
 <style>
 :root{
   --bg:#fff3f8;
@@ -152,6 +156,7 @@ button:disabled{opacity:.45;cursor:not-allowed;}
 .photo-preview{width:90px;height:90px;border-radius:10px;object-fit:cover;background:#f3f3f3;flex-shrink:0;}
 .modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px;}
 .hint{font-size:12px;color:var(--gray);margin-top:4px;}
+#sButtonUrl:disabled{background:#eee;color:#666;cursor:not-allowed;}
 .icon-field-wrap{position:relative;}
 .icon-picker-toggle{
   margin-top:6px;font-size:11.5px;font-weight:700;color:var(--pink-dark);background:none;padding:0;text-align:left;white-space:nowrap;
@@ -507,10 +512,10 @@ button:disabled{opacity:.45;cursor:not-allowed;}
         </div>
         <div class="field">
           <label>Enlace del botón</label>
-          <input type="text" id="sButtonUrl" placeholder="Ej: categorias/ o categorias/velas-peq">
+          <input type="text" id="sButtonUrl" placeholder="Ej: categorias/ o categorias/velas-peq" disabled>
         </div>
       </div>
-      <p class="hint">El enlace puede ser una categoría (por ejemplo <code>categorias/velas-peq</code>), la página de envíos (<code>opcionesdeenvio/</code>) o cualquier dirección web.</p>
+      <p class="hint">Este campo se completa automáticamente al elegir una opción en "Acceso rápido" y no se puede editar a mano, para evitar enlaces mal escritos. Si necesitas un enlace distinto (por ejemplo a WhatsApp o una página externa), elige "✏️ Personalizado" arriba — por ejemplo: <code>https://wa.me/51981004005</code>.</p>
     </div>
     <div class="field">
       <label>Orden (0 = primero)</label>
@@ -1275,7 +1280,8 @@ function renderSlideLinkPresetOptions(){
     '<option value="opcionesdeenvio/">Página de envíos (opcionesdeenvio/)</option>' +
     (categories.length ? '<optgroup label="Categorías">' +
       categories.map(c => `<option value="categorias/${c.id}">${c.icon} ${escapeHtml(c.name)}</option>`).join('') +
-      '</optgroup>' : '');
+      '</optgroup>' : '') +
+    '<option value="__custom__">✏️ Personalizado (escribir manualmente)</option>';
   presetSel.value = current;
 }
 
@@ -1685,14 +1691,33 @@ function updateSlideButtonFieldsVisibility(){
 document.getElementById('sShowButton').addEventListener('change', updateSlideButtonFieldsVisibility);
 
 document.getElementById('sButtonUrlPreset').addEventListener('change', function(){
-  if (this.value) document.getElementById('sButtonUrl').value = this.value;
+  const urlInput = document.getElementById('sButtonUrl');
+  if (this.value === '__custom__') {
+    urlInput.disabled = false;
+    urlInput.value = '';
+    urlInput.focus();
+  } else {
+    urlInput.disabled = true;
+    if (this.value) urlInput.value = this.value;
+  }
 });
 
 function syncSlideLinkPreset(){
   const presetSel = document.getElementById('sButtonUrlPreset');
-  const urlVal = document.getElementById('sButtonUrl').value;
-  const match = Array.from(presetSel.options).find(o => o.value === urlVal);
-  presetSel.value = match ? match.value : '';
+  const urlInput = document.getElementById('sButtonUrl');
+  const urlVal = urlInput.value;
+  const match = Array.from(presetSel.options).find(o => o.value === urlVal && o.value !== '__custom__');
+  if (match) {
+    presetSel.value = match.value;
+    urlInput.disabled = true;
+  } else if (urlVal) {
+    // Un enlace que no coincide con ninguna opción conocida = enlace personalizado guardado antes
+    presetSel.value = '__custom__';
+    urlInput.disabled = false;
+  } else {
+    presetSel.value = '';
+    urlInput.disabled = true;
+  }
 }
 
 const slideOverlay = document.getElementById('slideOverlay');
