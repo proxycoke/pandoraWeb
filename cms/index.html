@@ -316,6 +316,7 @@ button:disabled{opacity:.45;cursor:not-allowed;}
             <label>Carpeta con las fotos de estos productos (opcional, pero recomendado)</label>
             <input type="file" id="importPhotosFolder" webkitdirectory directory multiple>
             <p class="hint">Selecciona la carpeta completa donde tienes guardadas las fotos nuevas. El sistema busca cada foto por su nombre de archivo, tal como lo escribiste en el Excel.</p>
+            <p class="hint">📐 Medida recomendada: fotos <strong>cuadradas</strong> (mismo ancho que alto), de al menos <strong>640 x 640 px</strong>. Si alguna foto no es cuadrada, se recorta automáticamente para llenar el espacio — para que se vea completa y nítida, usa fotos cuadradas con lo más importante centrado.</p>
           </div>
           <button class="btn-primary" id="btnAnalyzeImport">Analizar archivo</button>
           <p class="hint" id="importAnalyzeError" style="color:#b91c1c;"></p>
@@ -387,6 +388,7 @@ button:disabled{opacity:.45;cursor:not-allowed;}
         </div>
       </div>
       <p class="hint">La foto se sube a tu proyecto de Supabase y se optimiza automáticamente para pesar lo menos posible. Si no eliges foto, se usará un ícono de color automático.</p>
+      <p class="hint">📐 Medida recomendada: foto <strong>cuadrada</strong> (mismo ancho que alto), de al menos <strong>640 x 640 px</strong>. Si subes una foto de otra medida no hay problema — se recorta automáticamente para llenar el espacio cuadrado — pero para que se vea completa y nítida, usa una foto cuadrada con lo más importante centrado.</p>
     </div>
     <div class="field checkbox-field">
       <input type="checkbox" id="pSold">
@@ -397,6 +399,7 @@ button:disabled{opacity:.45;cursor:not-allowed;}
     <div class="field-section">
       <h4>🖼️ Fotos adicionales (galería)</h4>
       <p class="hint">Se muestran en la página individual del producto, junto con la foto principal. Recomendado: al menos 3 fotos en total.</p>
+      <p class="hint">📐 Medida recomendada: fotos <strong>cuadradas</strong> (mismo ancho que alto), de al menos <strong>640 x 640 px</strong>, igual que la foto principal — así se ven completas y nítidas sin recortes feos.</p>
       <div class="gallery-list" id="galleryList"></div>
       <button class="dyn-add-btn" id="btnAddGalleryPhoto" type="button">+ Agregar foto</button>
     </div>
