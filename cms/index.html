@@ -152,6 +152,26 @@ button:disabled{opacity:.45;cursor:not-allowed;}
 .photo-preview{width:90px;height:90px;border-radius:10px;object-fit:cover;background:#f3f3f3;flex-shrink:0;}
 .modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px;}
 .hint{font-size:12px;color:var(--gray);margin-top:4px;}
+.icon-field-wrap{position:relative;}
+.icon-picker-toggle{
+  margin-top:6px;font-size:11.5px;font-weight:700;color:var(--pink-dark);background:none;padding:0;text-align:left;white-space:nowrap;
+}
+.icon-picker-toggle:hover{text-decoration:underline;}
+.icon-picker-panel{
+  display:none;position:absolute;top:100%;left:0;z-index:50;margin-top:6px;
+  background:#fff;border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow-lg);
+  padding:12px;width:300px;max-height:260px;overflow-y:auto;
+}
+.icon-picker-panel.open{display:block;}
+.icon-picker-group-label{font-size:11px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.03em;margin:10px 0 6px;}
+.icon-picker-group-label:first-child{margin-top:0;}
+.icon-picker-grid{display:flex;flex-wrap:wrap;gap:4px;}
+.icon-opt{
+  width:32px;height:32px;font-size:17px;border-radius:8px;border:1px solid transparent;background:var(--bg);
+  display:flex;align-items:center;justify-content:center;padding:0;flex-shrink:0;
+}
+.icon-opt:hover{background:#fde2ee;}
+.icon-opt.selected{border-color:var(--pink-dark);background:#fde2ee;}
 .status-pill{font-size:12px;background:#dcfce7;color:#166534;padding:5px 12px;border-radius:20px;font-weight:700;}
 .status-pill.danger{background:#fee2e2;color:#b91c1c;}
 .empty-msg{text-align:center;color:var(--gray);padding:40px 0;}
@@ -418,9 +438,11 @@ button:disabled{opacity:.45;cursor:not-allowed;}
       <input type="text" id="cName" placeholder="Ej: Importaciones">
     </div>
     <div class="field-row">
-      <div class="field" style="flex:0 0 90px;">
+      <div class="field icon-field-wrap" style="flex:0 0 90px;">
         <label>Ícono</label>
         <input type="text" id="cIcon" maxlength="4" placeholder="🎁">
+        <button type="button" class="icon-picker-toggle" id="btnToggleIconPicker">🔍 Elegir</button>
+        <div class="icon-picker-panel" id="iconPickerPanel"></div>
       </div>
       <div class="field" style="flex:0 0 90px;">
         <label>Color</label>
@@ -1515,6 +1537,50 @@ async function deleteProduct(id){
 }
 
 
+const ICON_GROUPS = [
+  { label: 'Velas y luz', icons: ['🕯️','🔥','🪔','💡','✨','⭐','🌟','💫','🏮','🎇','🎆'] },
+  { label: 'Decoración', icons: ['🎀','🎊','🎉','🪅','🧸','🖼️','🪞','🔔','👑','💎','🕰️'] },
+  { label: 'Regalos y compras', icons: ['🎁','🛍️','🛒','💝','🏷️','💰'] },
+  { label: 'Organización', icons: ['🗂️','📦','🧺','🗃️','📚','🧹','🧴'] },
+  { label: 'Naturaleza y estaciones', icons: ['🌸','🌺','🌻','🍀','🌙','☀️','❄️','🎄','🎃'] },
+  { label: 'Otros', icons: ['👗','👜','👠','💄','🧦','🧣','☕','🍯','🎨','🐝','🧩'] },
+];
+
+const iconPickerPanel = document.getElementById('iconPickerPanel');
+iconPickerPanel.innerHTML = ICON_GROUPS.map(g => `
+  <div class="icon-picker-group-label">${escapeHtml(g.label)}</div>
+  <div class="icon-picker-grid">
+    ${g.icons.map(ic => `<button type="button" class="icon-opt" data-icon="${ic}" title="${ic}">${ic}</button>`).join('')}
+  </div>
+`).join('');
+
+function refreshIconPickerSelection(){
+  const current = document.getElementById('cIcon').value.trim();
+  iconPickerPanel.querySelectorAll('.icon-opt').forEach(btn => {
+    btn.classList.toggle('selected', btn.dataset.icon === current);
+  });
+}
+
+document.getElementById('btnToggleIconPicker').addEventListener('click', (e) => {
+  e.stopPropagation();
+  refreshIconPickerSelection();
+  iconPickerPanel.classList.toggle('open');
+});
+
+iconPickerPanel.addEventListener('click', (e) => {
+  const btn = e.target.closest('.icon-opt');
+  if (!btn) return;
+  document.getElementById('cIcon').value = btn.dataset.icon;
+  refreshIconPickerSelection();
+  iconPickerPanel.classList.remove('open');
+});
+
+document.addEventListener('click', (e) => {
+  if (!iconPickerPanel.classList.contains('open')) return;
+  if (e.target.closest('.icon-field-wrap')) return;
+  iconPickerPanel.classList.remove('open');
+});
+
 const catOverlay = document.getElementById('catOverlay');
 function openCatModal(id){
   editingCatId = id;
@@ -1537,7 +1603,7 @@ function openCatModal(id){
   }
   catOverlay.classList.add('open');
 }
-function closeCatModal(){ catOverlay.classList.remove('open'); }
+function closeCatModal(){ catOverlay.classList.remove('open'); iconPickerPanel.classList.remove('open'); }
 document.getElementById('btnCancelCat').addEventListener('click', closeCatModal);
 
 document.getElementById('cName').addEventListener('input', () => {
