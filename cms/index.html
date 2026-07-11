@@ -387,6 +387,11 @@ button:disabled{opacity:.45;cursor:not-allowed;}
           <button class="btn-outline" id="btnRemovePhoto" style="margin-top:6px;">Quitar foto</button>
         </div>
       </div>
+      <div class="field checkbox-field" style="margin-top:8px;">
+        <input type="checkbox" id="pApplyWatermark" checked>
+        <label for="pApplyWatermark" style="margin:0;">Agregar marca de agua</label>
+      </div>
+      <p class="hint">🔒 Con la casilla marcada, la foto principal y todas las de la galería llevan incrustado el logo de Pandora en mosaico, para proteger tus fotos si alguien las copia. Puedes activarla o desactivarla en cualquier momento — incluso en fotos ya guardadas de antes — sin necesidad de volver a seleccionarlas ni subirlas de nuevo.</p>
       <p class="hint">La foto se sube a tu proyecto de Supabase y se optimiza automáticamente para pesar lo menos posible. Si no eliges foto, se usará un ícono de color automático.</p>
       <p class="hint">📐 Medida recomendada: foto <strong>cuadrada</strong> (mismo ancho que alto), de al menos <strong>640 x 640 px</strong>. Si subes una foto de otra medida no hay problema — se recorta automáticamente para llenar el espacio cuadrado — pero para que se vea completa y nítida, usa una foto cuadrada con lo más importante centrado.</p>
     </div>
@@ -538,9 +543,14 @@ button:disabled{opacity:.45;cursor:not-allowed;}
 <script>
 
 
-const SUPABASE_URL = "https://ajbwvnfojvgwonemflbp.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_6U3KTAzSb3BUqIR-Clz0uQ_atPYHrF-";
+const SUPABASE_URL = "https://uukwnfydriezpswnabln.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_TywPnO-iX4NKcJuUXBO6jQ_xorjibTI";
 const PHOTOS_BUCKET = "product-photos";
+// Bucket PRIVADO (no público) donde se guarda la copia SIN marca de agua de cada
+// foto de producto — necesaria para poder activar/desactivar la marca en cualquier
+// momento sin pedir que se vuelva a subir la foto. Solo el CMS, ya logueado, puede
+// leer aquí (ver migracion_marca_agua.sql): nunca es alcanzable desde la web pública.
+const ORIGINALS_BUCKET = "product-photos-originals";
 
 
 let categories = [];       
@@ -554,11 +564,19 @@ let lastActivityAt = 0;
 let editingProductId = null;   
 let editingCatId = null;       
 let editingSlideId = null;     
-let pendingPhoto = null;       
-let pendingSlidePhoto = null;  
-let specsRows = [];            
-let wholesaleRows = [];        
-let galleryRows = [];          
+let pendingSlidePhoto = null;
+let specsRows = [];
+let wholesaleRows = [];
+let galleryRows = [];
+// Estado de la foto principal del producto que se está creando/editando:
+//   null                      -> sin foto (o, si se está editando, no se tocó)
+//   'REMOVE'                  -> el usuario quitó la foto
+//   {type:'new', file}        -> se eligió un archivo nuevo en esta sesión
+//   {type:'existing', url}    -> foto ya guardada de antes, sin archivo nuevo elegido
+let mainPhotoState = null;
+// Valor de "Agregar marca de agua" cuando se abrió el modal (para saber si el
+// usuario lo cambió y por lo tanto hay que reprocesar las fotos ya guardadas).
+let initialWatermarkEnabled = true;
 
 
 const SESSION_KEY = 'pb_cms_session';
@@ -795,6 +813,201 @@ async function resizeImageFile(file, maxDim, quality){
     reader.onerror = () => reject(new Error('no se pudo leer el archivo'));
     reader.readAsDataURL(file);
   });
+}
+
+// ============================================================
+// Marca de agua opcional (por producto, aplica a foto principal + galería)
+// ============================================================
+// Usa el logo limpio de Pandora (assets/img/watermark-mark.png) y lo repite
+// dibujándolo nosotros mismos en el canvas (mismo mosaico ya validado antes).
+const WATERMARK_MARK_URL = '../assets/img/watermark-mark.png';
+const WATERMARK_ANGLE_DEG = -20;
+const WATERMARK_ALPHA = 0.55;
+let _watermarkImagePromise = null;
+function getWatermarkImage(){
+  if (!_watermarkImagePromise) {
+    _watermarkImagePromise = new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error('no se pudo cargar la marca de agua'));
+      img.src = WATERMARK_MARK_URL;
+    });
+  }
+  return _watermarkImagePromise;
+}
+function drawWatermark(ctx, w, h, logoImg){
+  ctx.save();
+  const scale = Math.max(0.7, w / 640);
+  const logoW = logoImg.width * scale;
+  const logoH = logoImg.height * scale;
+  ctx.globalAlpha = WATERMARK_ALPHA;
+  ctx.translate(w / 2, h / 2);
+  ctx.rotate(WATERMARK_ANGLE_DEG * Math.PI / 180);
+  const diag = Math.ceil(Math.sqrt(w * w + h * h));
+  const stepX = logoW * 2.3;
+  const stepY = logoH * 3.4;
+  for (let y = -diag; y <= diag; y += stepY) {
+    for (let x = -diag; x <= diag; x += stepX) {
+      ctx.drawImage(logoImg, x - logoW / 2, y - logoH / 2, logoW, logoH);
+    }
+  }
+  ctx.restore();
+}
+
+// Carga una imagen desde un <input type=file> recién elegido.
+function loadImageFromFile(file){
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error('imagen inválida'));
+      img.src = e.target.result;
+    };
+    reader.onerror = () => reject(new Error('no se pudo leer el archivo'));
+    reader.readAsDataURL(file);
+  });
+}
+// Carga una imagen desde un Blob ya descargado (p.ej. la copia limpia del bucket privado).
+function loadImageFromBlob(blob){
+  const objUrl = URL.createObjectURL(blob);
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error('imagen inválida'));
+    img.src = objUrl;
+  });
+}
+// Carga una imagen desde su URL pública (bucket "product-photos"), para cuando no
+// hay copia limpia guardada todavía (fotos de antes de esta función).
+function loadImageFromUrlPublic(url){
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error('no se pudo cargar la imagen'));
+    img.src = url;
+  });
+}
+
+// Redimensiona una imagen ya cargada y devuelve dos variantes: limpia y con marca
+// de agua (o null si no se pidió marca). Usa dos canvas independientes para que
+// nunca haya riesgo de que una exportación quede a medio dibujar la otra.
+async function renderVariants(img, maxDim, quality, watermarkImg){
+  maxDim = maxDim || 640; quality = quality || 0.72;
+  let w = img.width, h = img.height;
+  if (w > maxDim || h > maxDim) {
+    if (w > h) { h = Math.round(h * maxDim / w); w = maxDim; }
+    else { w = Math.round(w * maxDim / h); h = maxDim; }
+  }
+  function makeBaseCanvas(){
+    const canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, w, h);
+    ctx.drawImage(img, 0, 0, w, h);
+    return { canvas, ctx };
+  }
+  const clean = makeBaseCanvas();
+  const cleanBlob = await new Promise(resolve => clean.canvas.toBlob(resolve, 'image/jpeg', quality));
+  let watermarkedBlob = null;
+  if (watermarkImg) {
+    const wm = makeBaseCanvas();
+    drawWatermark(wm.ctx, w, h, watermarkImg);
+    watermarkedBlob = await new Promise(resolve => wm.canvas.toBlob(resolve, 'image/jpeg', quality));
+  }
+  return { cleanBlob, watermarkedBlob };
+}
+
+function newPhotoId(){
+  return `${Date.now()}-${Math.random().toString(36).slice(2,8)}-${Math.random().toString(36).slice(2,8)}`;
+}
+// El "id" de una foto es el nombre del archivo (sin extensión) dentro de su URL
+// pública — se usa para encontrar su copia limpia hermana en el bucket privado
+// (mismo id, distinto bucket), sin necesitar ninguna tabla nueva en la base de datos.
+function photoIdFromDisplayUrl(url){
+  if (!url) return null;
+  const m = url.match(/\/([^\/]+)\.[a-zA-Z0-9]+(?:\?.*)?$/);
+  return m ? m[1] : null;
+}
+
+async function uploadToBucket(bucket, path, blob){
+  await ensureFreshToken();
+  const res = await fetch(`${SUPABASE_URL}/storage/v1/object/${bucket}/${path}`, {
+    method: 'POST',
+    headers: {
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': blob.type || 'image/jpeg',
+      'x-upsert': 'true',
+    },
+    body: blob,
+  });
+  if (!res.ok) {
+    if (res.status === 401 && accessToken) forceLogout('Tu sesión expiró. Vuelve a iniciar sesión.');
+    let msg = 'No se pudo subir la foto.';
+    try { const j = await res.json(); msg = j.message || msg; } catch(e){}
+    throw new Error(msg);
+  }
+}
+function publicUrlFor(bucket, path){
+  return `${SUPABASE_URL}/storage/v1/object/public/${bucket}/${path}`;
+}
+async function fetchFromBucket(bucket, path){
+  await ensureFreshToken();
+  const res = await fetch(`${SUPABASE_URL}/storage/v1/object/${bucket}/${path}`, {
+    headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) throw new Error('not-found');
+  return res.blob();
+}
+
+// Punto único que decide qué hacer con UNA foto (principal o de galería) al
+// guardar el producto, según su estado y si la marca de agua cambió:
+//  - 'REMOVE'                         -> se quitó la foto
+//  - null                             -> no hay nada que hacer con esta foto
+//  - {type:'new', file}               -> foto recién elegida (nueva o reemplazo)
+//  - {type:'existing', url}           -> foto ya guardada de antes, sin archivo nuevo
+async function processPhotoSlot(state, finalWatermarkEnabled, watermarkChanged){
+  if (state === 'REMOVE') return { url: null, changed: true };
+  if (state == null) return { url: undefined, changed: false };
+
+  if (state.type === 'existing' && !watermarkChanged) {
+    return { url: state.url, changed: false };
+  }
+
+  const watermarkImg = finalWatermarkEnabled ? await getWatermarkImage() : null;
+
+  if (state.type === 'new') {
+    const img = await loadImageFromFile(state.file);
+    const { cleanBlob, watermarkedBlob } = await renderVariants(img, 640, 0.72, watermarkImg);
+    const photoId = newPhotoId();
+    await uploadToBucket(ORIGINALS_BUCKET, `originals/${photoId}.jpg`, cleanBlob);
+    await uploadToBucket(PHOTOS_BUCKET, `products/${photoId}.jpg`, finalWatermarkEnabled ? watermarkedBlob : cleanBlob);
+    return { url: publicUrlFor(PHOTOS_BUCKET, `products/${photoId}.jpg`), changed: true };
+  }
+
+  // state.type === 'existing' && watermarkChanged: reprocesar desde la copia limpia,
+  // sin pedir la foto de nuevo.
+  const photoId = photoIdFromDisplayUrl(state.url);
+  let cleanSourceBlob;
+  try {
+    cleanSourceBlob = await fetchFromBucket(ORIGINALS_BUCKET, `originals/${photoId}.jpg`);
+  } catch (e) {
+    // Foto de antes de que existiera esta función: no hay copia limpia guardada.
+    // Como esas fotos nunca tuvieron marca de agua, se usa la imagen actual tal
+    // cual como si fuera la copia limpia, y de paso se guarda su copia limpia
+    // recién ahora para que los próximos cambios sean instantáneos.
+    const res = await fetch(state.url);
+    if (!res.ok) throw new Error('No se pudo descargar la foto actual.');
+    cleanSourceBlob = await res.blob();
+  }
+  const img = await loadImageFromBlob(cleanSourceBlob);
+  const { cleanBlob, watermarkedBlob } = await renderVariants(img, 640, 0.72, watermarkImg);
+  await uploadToBucket(ORIGINALS_BUCKET, `originals/${photoId}.jpg`, cleanBlob);
+  await uploadToBucket(PHOTOS_BUCKET, `products/${photoId}.jpg`, finalWatermarkEnabled ? watermarkedBlob : cleanBlob);
+  return { url: state.url, changed: true };
 }
 
 function dataUrlToBlob(dataUrl){
@@ -1346,7 +1559,7 @@ document.getElementById('btnClearImportFilter').addEventListener('click', () => 
 const productOverlay = document.getElementById('productOverlay');
 function openProductModal(id){
   editingProductId = id;
-  pendingPhoto = null;
+  mainPhotoState = null;
   document.getElementById('productError').textContent = '';
   document.getElementById('pPhotoFile').value = '';
   renderCatFilterOptions();
@@ -1363,6 +1576,7 @@ function openProductModal(id){
     specsRows = [];
     wholesaleRows = [];
     galleryRows = [];
+    initialWatermarkEnabled = true;
   } else {
     const p = products.find(x => x.id === id);
     document.getElementById('productModalTitle').textContent = 'Editar producto';
@@ -1375,8 +1589,11 @@ function openProductModal(id){
     document.getElementById('pDescription').value = p.description || '';
     specsRows = Array.isArray(p.specifications) ? p.specifications.map(s => ({ label: s.label || '', value: s.value || '' })) : [];
     wholesaleRows = Array.isArray(p.wholesale_tiers) ? p.wholesale_tiers.map(t => ({ label: t.label || '', price: (t.price == null ? '' : t.price) })) : [];
-    galleryRows = Array.isArray(p.gallery_photos) ? p.gallery_photos.map(u => ({ url: u, blob: null, previewUrl: null })) : [];
+    galleryRows = Array.isArray(p.gallery_photos) ? p.gallery_photos.map(u => ({ state: { type: 'existing', url: u }, previewUrl: null })) : [];
+    if (p.photo_url) mainPhotoState = { type: 'existing', url: p.photo_url };
+    initialWatermarkEnabled = p.watermark_enabled !== false;
   }
+  document.getElementById('pApplyWatermark').checked = initialWatermarkEnabled;
   renderSpecsList();
   renderWholesaleTiersList();
   renderGalleryList();
@@ -1435,7 +1652,7 @@ document.getElementById('btnAddWholesaleTier').addEventListener('click', () => {
 function renderGalleryList(){
   const wrap = document.getElementById('galleryList');
   wrap.innerHTML = galleryRows.map((r, i) => {
-    const src = r.previewUrl || r.url || '';
+    const src = r.previewUrl || (r.state && r.state.type === 'existing' ? r.state.url : '') || '';
     return `
     <div class="gallery-item" data-idx="${i}">
       ${src ? `<img src="${src}" alt="">` : `<div style="width:56px;height:56px;border-radius:8px;background:#f3f3f3;flex-shrink:0;"></div>`}
@@ -1449,14 +1666,13 @@ function renderGalleryList(){
       const idx = Number(inp.dataset.idx);
       const file = e.target.files[0];
       if (!file) return;
+      galleryRows[idx].state = { type: 'new', file };
       try {
-        const blob = await resizeImageFile(file);
-        galleryRows[idx].blob = blob;
-        galleryRows[idx].previewUrl = URL.createObjectURL(blob);
-        renderGalleryList();
+        await renderGalleryRowPreview(idx);
       } catch (err) {
         document.getElementById('productError').textContent = 'No se pudo procesar una de las fotos adicionales.';
       }
+      renderGalleryList();
     });
   });
   wrap.querySelectorAll('[data-remove]').forEach(btn => {
@@ -1464,29 +1680,85 @@ function renderGalleryList(){
   });
 }
 document.getElementById('btnAddGalleryPhoto').addEventListener('click', () => {
-  galleryRows.push({ url: null, blob: null, previewUrl: null });
+  galleryRows.push({ state: null, previewUrl: null });
   renderGalleryList();
 });
 function closeProductModal(){ productOverlay.classList.remove('open'); }
 document.getElementById('btnNewProduct').addEventListener('click', () => openProductModal(null));
 document.getElementById('btnCancelProduct').addEventListener('click', closeProductModal);
 
-function processMainPhoto(file){
+// Vuelve a dibujar la vista previa de la foto principal a partir de su estado
+// actual (archivo recién elegido, o la copia limpia de una foto ya guardada) y
+// del estado ACTUAL de la casilla "Agregar marca de agua".
+async function renderMainPhotoPreview(){
+  if (!mainPhotoState || mainPhotoState === 'REMOVE') return;
+  const applyWatermark = document.getElementById('pApplyWatermark').checked;
+  try {
+    let img;
+    if (mainPhotoState.type === 'new') {
+      img = await loadImageFromFile(mainPhotoState.file);
+    } else {
+      const photoId = photoIdFromDisplayUrl(mainPhotoState.url);
+      try {
+        const blob = await fetchFromBucket(ORIGINALS_BUCKET, `originals/${photoId}.jpg`);
+        img = await loadImageFromBlob(blob);
+      } catch (e) {
+        img = await loadImageFromUrlPublic(mainPhotoState.url);
+      }
+    }
+    const watermarkImg = applyWatermark ? await getWatermarkImage() : null;
+    const { cleanBlob, watermarkedBlob } = await renderVariants(img, 640, 0.72, watermarkImg);
+    document.getElementById('pPhotoPreview').src = URL.createObjectURL(applyWatermark ? watermarkedBlob : cleanBlob);
+  } catch (e) {
+    // no se pudo refrescar la vista previa; se deja la que ya estaba mostrándose
+  }
+}
+async function renderGalleryRowPreview(idx){
+  const row = galleryRows[idx];
+  if (!row || !row.state) return;
+  const applyWatermark = document.getElementById('pApplyWatermark').checked;
+  let img;
+  if (row.state.type === 'new') {
+    img = await loadImageFromFile(row.state.file);
+  } else {
+    const photoId = photoIdFromDisplayUrl(row.state.url);
+    try {
+      const blob = await fetchFromBucket(ORIGINALS_BUCKET, `originals/${photoId}.jpg`);
+      img = await loadImageFromBlob(blob);
+    } catch (e) {
+      img = await loadImageFromUrlPublic(row.state.url);
+    }
+  }
+  const watermarkImg = applyWatermark ? await getWatermarkImage() : null;
+  const { cleanBlob, watermarkedBlob } = await renderVariants(img, 640, 0.72, watermarkImg);
+  row.previewUrl = URL.createObjectURL(applyWatermark ? watermarkedBlob : cleanBlob);
+}
+async function renderAllGalleryPreviews(){
+  for (let i = 0; i < galleryRows.length; i++) {
+    if (galleryRows[i].state) {
+      try { await renderGalleryRowPreview(i); } catch (e) { /* deja la vista previa anterior */ }
+    }
+  }
+  renderGalleryList();
+}
+document.getElementById('pPhotoFile').addEventListener('change', e => {
+  const file = e.target.files[0];
   if (!file) return;
-  resizeImageFile(file).then(blob => {
-    pendingPhoto = { blob, ext: 'jpg' };
-    document.getElementById('pPhotoPreview').src = URL.createObjectURL(blob);
-  }).catch(() => {
+  mainPhotoState = { type: 'new', file };
+  renderMainPhotoPreview().catch(() => {
     document.getElementById('productError').textContent = 'No se pudo procesar la imagen.';
   });
-}
-document.getElementById('pPhotoFile').addEventListener('change', e => processMainPhoto(e.target.files[0]));
+});
 document.getElementById('btnRemovePhoto').addEventListener('click', () => {
-  pendingPhoto = 'REMOVE';
+  mainPhotoState = 'REMOVE';
   const cat = document.getElementById('pCat').value;
   const name = document.getElementById('pName').value;
   document.getElementById('pPhotoPreview').src = placeholderImage(cat, name);
   document.getElementById('pPhotoFile').value = '';
+});
+document.getElementById('pApplyWatermark').addEventListener('change', () => {
+  renderMainPhotoPreview();
+  renderAllGalleryPreviews();
 });
 
 document.getElementById('btnSaveProduct').addEventListener('click', async () => {
@@ -1531,23 +1803,26 @@ document.getElementById('btnSaveProduct').addEventListener('click', async () => 
   errEl.textContent = '';
   saveBtn.disabled = true; saveBtn.textContent = 'Guardando...';
   try {
-    let photo_url;
-    if (pendingPhoto === 'REMOVE') photo_url = null;
-    else if (pendingPhoto && pendingPhoto.blob) photo_url = await uploadPhoto(pendingPhoto.blob, pendingPhoto.ext);
+    const finalWatermarkEnabled = document.getElementById('pApplyWatermark').checked;
+    const watermarkChanged = finalWatermarkEnabled !== initialWatermarkEnabled;
 
-    
+    let photo_url;
+    const mainResult = await processPhotoSlot(mainPhotoState, finalWatermarkEnabled, watermarkChanged);
+    if (mainResult.url !== undefined) photo_url = mainResult.url;
+
     const gallery_photos = [];
     for (const r of galleryRows) {
-      if (r.blob) gallery_photos.push(await uploadPhoto(r.blob, 'jpg'));
-      else if (r.url) gallery_photos.push(r.url);
+      if (!r.state) continue;
+      const res = await processPhotoSlot(r.state, finalWatermarkEnabled, watermarkChanged);
+      if (res.url) gallery_photos.push(res.url);
     }
 
     if (editingProductId == null) {
-      const row = { name, category_id: cat, price, wholesale, sold, sort_order: products.length, description, specifications, wholesale_tiers, gallery_photos };
+      const row = { name, category_id: cat, price, wholesale, sold, sort_order: products.length, description, specifications, wholesale_tiers, gallery_photos, watermark_enabled: finalWatermarkEnabled };
       if (photo_url) row.photo_url = photo_url;
       await restRequest('POST', 'products', { body: row, prefer: 'return=representation' });
     } else {
-      const row = { name, category_id: cat, price, wholesale, sold, description, specifications, wholesale_tiers, gallery_photos };
+      const row = { name, category_id: cat, price, wholesale, sold, description, specifications, wholesale_tiers, gallery_photos, watermark_enabled: finalWatermarkEnabled };
       if (photo_url !== undefined) row.photo_url = photo_url;
       await restRequest('PATCH', 'products', { query: `?id=eq.${editingProductId}`, body: row, prefer: 'return=representation' });
     }
