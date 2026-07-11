@@ -490,17 +490,28 @@ button:disabled{opacity:.45;cursor:not-allowed;}
       <input type="checkbox" id="sShowButton" checked>
       <label for="sShowButton" style="margin:0;">Mostrar botón</label>
     </div>
-    <div class="field-row">
+    <div id="slideButtonFieldsWrap">
       <div class="field">
-        <label>Texto del botón</label>
-        <input type="text" id="sButtonText" placeholder="Ej: Ver catálogo">
+        <label>Acceso rápido (opcional)</label>
+        <select id="sButtonUrlPreset">
+          <option value="">-- Elegir una categoría o página para completar el enlace --</option>
+          <option value="categorias/">Todas las categorías (categorias/)</option>
+          <option value="opcionesdeenvio/">Página de envíos (opcionesdeenvio/)</option>
+        </select>
+        <p class="hint">Elige aquí para completar el campo "Enlace del botón" automáticamente, sin tener que saber el nombre exacto.</p>
       </div>
-      <div class="field">
-        <label>Enlace del botón</label>
-        <input type="text" id="sButtonUrl" placeholder="Ej: categorias/ o categorias/velas-peq">
+      <div class="field-row">
+        <div class="field">
+          <label>Texto del botón</label>
+          <input type="text" id="sButtonText" placeholder="Ej: Ver catálogo">
+        </div>
+        <div class="field">
+          <label>Enlace del botón</label>
+          <input type="text" id="sButtonUrl" placeholder="Ej: categorias/ o categorias/velas-peq">
+        </div>
       </div>
+      <p class="hint">El enlace puede ser una categoría (por ejemplo <code>categorias/velas-peq</code>), la página de envíos (<code>opcionesdeenvio/</code>) o cualquier dirección web.</p>
     </div>
-    <p class="hint">El enlace puede ser una categoría (por ejemplo <code>categorias/velas-peq</code>), la página de envíos (<code>opcionesdeenvio/</code>) o cualquier dirección web.</p>
     <div class="field">
       <label>Orden (0 = primero)</label>
       <input type="number" id="sOrder" min="0" step="1" value="0">
@@ -705,7 +716,7 @@ async function restRequest(method, table, { query = '', body = null, prefer = nu
   if (body != null) headers['Content-Type'] = 'application/json';
   if (prefer) headers['Prefer'] = prefer;
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}${query}`, {
-    method, headers, body: body != null ? JSON.stringify(body) : undefined,
+    method, headers, cache: 'no-store', body: body != null ? JSON.stringify(body) : undefined,
   });
   const text = await res.text();
   if (!res.ok) {
@@ -1250,6 +1261,22 @@ function renderCatFilterOptions(){
 
   const pCat = document.getElementById('pCat');
   pCat.innerHTML = categories.map(c => `<option value="${c.id}">${c.icon} ${escapeHtml(c.name)}</option>`).join('');
+
+  renderSlideLinkPresetOptions();
+}
+
+function renderSlideLinkPresetOptions(){
+  const presetSel = document.getElementById('sButtonUrlPreset');
+  if (!presetSel) return;
+  const current = presetSel.value;
+  presetSel.innerHTML =
+    '<option value="">-- Elegir una categoría o página para completar el enlace --</option>' +
+    '<option value="categorias/">Todas las categorías (categorias/)</option>' +
+    '<option value="opcionesdeenvio/">Página de envíos (opcionesdeenvio/)</option>' +
+    (categories.length ? '<optgroup label="Categorías">' +
+      categories.map(c => `<option value="categorias/${c.id}">${c.icon} ${escapeHtml(c.name)}</option>`).join('') +
+      '</optgroup>' : '');
+  presetSel.value = current;
 }
 
 function renderCategories(){
@@ -1651,6 +1678,23 @@ async function deleteCategory(id){
 }
 
 
+function updateSlideButtonFieldsVisibility(){
+  const show = document.getElementById('sShowButton').checked;
+  document.getElementById('slideButtonFieldsWrap').style.display = show ? '' : 'none';
+}
+document.getElementById('sShowButton').addEventListener('change', updateSlideButtonFieldsVisibility);
+
+document.getElementById('sButtonUrlPreset').addEventListener('change', function(){
+  if (this.value) document.getElementById('sButtonUrl').value = this.value;
+});
+
+function syncSlideLinkPreset(){
+  const presetSel = document.getElementById('sButtonUrlPreset');
+  const urlVal = document.getElementById('sButtonUrl').value;
+  const match = Array.from(presetSel.options).find(o => o.value === urlVal);
+  presetSel.value = match ? match.value : '';
+}
+
 const slideOverlay = document.getElementById('slideOverlay');
 function openSlideModal(id){
   editingSlideId = id;
@@ -1687,6 +1731,8 @@ function openSlideModal(id){
       document.getElementById('sPhotoPreview').style.background = s.bg_color || '#5b1049';
     }
   }
+  syncSlideLinkPreset();
+  updateSlideButtonFieldsVisibility();
   slideOverlay.classList.add('open');
 }
 function closeSlideModal(){ slideOverlay.classList.remove('open'); }

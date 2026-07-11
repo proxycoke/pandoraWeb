@@ -7,7 +7,10 @@
 <meta id="metaDescription" name="description" content="Explora todas las categorías de Pandora Boutique: velas LED, luces, candelabros, estrellas decorativas y artículos de organización.">
 <link id="canonicalLink" rel="canonical" href="https://pandoraimport.com/categorias/">
 <meta name="theme-color" content="#5b1049">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%23ec1e79'/%3E%3Ctext x='50' y='68' font-size='58' font-family='Arial' font-weight='bold' fill='white' text-anchor='middle'%3EP%3C/text%3E%3C/svg%3E">
+<link rel="icon" type="image/x-icon" href="../assets/img/favicon.ico">
+<link rel="icon" type="image/png" sizes="16x16" href="../assets/img/favicon-16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="../assets/img/favicon-32.png">
+<link rel="apple-touch-icon" sizes="180x180" href="../assets/img/apple-touch-icon.png">
 
 
 <meta id="ogType" property="og:type" content="website">
@@ -72,18 +75,18 @@ ul{list-style:none;}
 
 
 .topbar{
-  background:var(--black);
+  background:#e52d80;
   color:#fff;
   text-align:center;
   font-size:13px;
   padding:8px 12px;
   letter-spacing:.3px;
 }
-.topbar strong{color:#ff8fc4;}
+.topbar strong{color:#ffffff;}
 .topbar-line2{
-  font-size:12px;color:#f3c9dd;margin-top:3px;
+  font-size:12px;color:#ffffff;margin-top:3px;
 }
-.topbar-line2 a{color:#ff8fc4;font-weight:700;text-decoration:underline;}
+.topbar-line2 a{color:#5b1049;font-weight:700;text-decoration:underline;}
 .logo-script{
   font-family:'Pacifico',cursive;
   font-size:24px;
@@ -141,7 +144,7 @@ header.main-header{
 
 
 nav.cat-nav{
-  background:var(--black);
+  background:#2a2a2a;
 }
 .cat-nav ul{
   display:flex;gap:6px;overflow-x:auto;padding:0 20px;max-width:1280px;margin:0 auto;
@@ -270,10 +273,10 @@ nav.cat-nav{
 .promo-card p{font-size:13px;opacity:.9;}
 
 
-footer{background:var(--black);color:#ccc;padding:44px 0 20px;margin-top:20px;}
+footer{background:#f4bad7;color:#424242;padding:44px 0 20px;margin-top:20px;}
 .footer-grid{display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:26px;margin-bottom:30px;}
-.footer-grid h5{color:#fff;font-size:14px;margin-bottom:14px;font-weight:800;}
-.footer-grid p, .footer-grid li{font-size:13px;color:#aaa;margin-bottom:9px;line-height:1.5;}
+.footer-grid h5{color:#e52d80;font-size:14px;margin-bottom:14px;font-weight:800;}
+.footer-grid p, .footer-grid li{font-size:13px;color:#424242;margin-bottom:9px;line-height:1.5;}
 .footer-grid li a:hover{color:#fff;}
 .social-row{display:flex;gap:10px;margin-top:12px;}
 .social-row a{
@@ -286,7 +289,7 @@ footer{background:var(--black);color:#ccc;padding:44px 0 20px;margin-top:20px;}
   background:#2a2a2a;padding:5px 10px;border-radius:6px;font-size:11px;font-weight:700;color:#ddd;
 }
 .footer-bottom{
-  border-top:1px solid #2a2a2a;padding-top:18px;text-align:center;font-size:12px;color:#888;
+  border-top:1px solid #2a2a2a;padding-top:18px;text-align:center;font-size:12px;color:#424242;
 }
 
 
@@ -698,8 +701,61 @@ let CATEGORIES = [];
 let catById = {};
 let PRODUCTS = [];
 
+// Refresco automático programado: la web se recarga sola a las horas en que
+// normalmente se suben productos nuevos (00:00 y 07:00, hora de Perú), para
+// que los clientes vean el catálogo actualizado sin tener que hacer nada.
+// Es "inteligente": si alguien tiene la pestaña abierta y activa en ese
+// momento, no la interrumpe — espera a que la deje y vuelva a ella.
+(function scheduleContentRefresh() {
+  const REFRESH_HOURS = [0, 7]; // hora de Perú (America/Lima)
+  const CHECK_INTERVAL_MS = 30 * 1000; // revisa cada 30 segundos
+  let pendingRefresh = false;
+
+  function getPeruHM() {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/Lima", hour: "2-digit", minute: "2-digit", hour12: false,
+    }).formatToParts(new Date());
+    return {
+      h: Number(parts.find(p => p.type === "hour").value),
+      m: Number(parts.find(p => p.type === "minute").value),
+    };
+  }
+
+  function peruDateKey() {
+    return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Lima" }).format(new Date());
+  }
+
+  function doRefresh(hour) {
+    sessionStorage.setItem("pandoraAutoRefresh_" + hour, peruDateKey());
+    if (document.hidden) {
+      location.reload();
+    } else {
+      pendingRefresh = true;
+    }
+  }
+
+  function checkSchedule() {
+    const { h, m } = getPeruHM();
+    if (m !== 0 || !REFRESH_HOURS.includes(h)) return;
+    const key = "pandoraAutoRefresh_" + h;
+    if (sessionStorage.getItem(key) === peruDateKey()) return;
+    doRefresh(h);
+  }
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible" && pendingRefresh) {
+      pendingRefresh = false;
+      location.reload();
+    }
+  });
+
+  setInterval(checkSchedule, CHECK_INTERVAL_MS);
+  checkSchedule();
+})();
+
 async function restGet(table, qs) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${qs}`, {
+    cache: "no-store",
     headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
   });
   if (!res.ok) throw new Error("No se pudo cargar " + table);
