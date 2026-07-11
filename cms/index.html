@@ -387,13 +387,7 @@ button:disabled{opacity:.45;cursor:not-allowed;}
           <button class="btn-outline" id="btnRemovePhoto" style="margin-top:6px;">Quitar foto</button>
         </div>
       </div>
-      <div class="field checkbox-field" style="margin-top:8px;">
-        <input type="checkbox" id="pApplyWatermark" checked>
-        <label for="pApplyWatermark" style="margin:0;">Agregar marca de agua</label>
-      </div>
       <p class="hint">La foto se sube a tu proyecto de Supabase y se optimiza automáticamente para pesar lo menos posible. Si no eliges foto, se usará un ícono de color automático.</p>
-      <p class="hint">🔒 Con la casilla marcada, la foto principal y las de la galería llevan incrustado el logo de Pandora en mosaico, para proteger tus fotos si alguien las copia. Desmárcala si por algún motivo no quieres marca de agua en las fotos de este producto. Las fotos de importación masiva y del carrusel siempre la llevan.</p>
-      <p class="hint" id="watermarkToggleNote" style="display:none;color:#b45309;">⚠️ Esta foto ya estaba guardada de antes. Marcar/desmarcar la casilla no cambia una foto ya subida — vuelve a seleccionarla (arriba o en la galería) para que se procese de nuevo con o sin marca de agua.</p>
       <p class="hint">📐 Medida recomendada: foto <strong>cuadrada</strong> (mismo ancho que alto), de al menos <strong>640 x 640 px</strong>. Si subes una foto de otra medida no hay problema — se recorta automáticamente para llenar el espacio cuadrado — pero para que se vea completa y nítida, usa una foto cuadrada con lo más importante centrado.</p>
     </div>
     <div class="field checkbox-field">
@@ -775,54 +769,8 @@ async function uploadPhoto(blob, ext, folder){
   return `${SUPABASE_URL}/storage/v1/object/public/${PHOTOS_BUCKET}/${path}`;
 }
 
-// Marca de agua: se "quema" en los píxeles de CADA imagen que se sube (foto principal,
-// galería, importación masiva y carrusel), siempre en el mismo paso donde se redimensiona.
-// Al quedar incrustada en el archivo mismo (no como una capa de CSS/HTML encima), no existe
-// ninguna versión sin marca que alguien pueda descargar inspeccionando la página o la URL de
-// la foto — la única copia que se sube a Supabase ya la trae puesta.
-// Usa un solo logo de Pandora limpio (assets/img/watermark-mark.png, recortado de la hoja de
-// patrón que subió el usuario) y lo repite dibujándolo nosotros mismos en el canvas — así
-// evitamos el "cortado" que salía al usar la hoja de patrón entera como mosaico (sus bordes
-// no encajaban entre sí y el logo quedaba partido cada 460px).
-const WATERMARK_MARK_URL = '../assets/img/watermark-mark.png';
-const WATERMARK_ANGLE_DEG = -20;
-const WATERMARK_ALPHA = 0.55;
-let _watermarkImagePromise = null;
-function getWatermarkImage(){
-  if (!_watermarkImagePromise) {
-    _watermarkImagePromise = new Promise((resolve, reject) => {
-      const img = new Image();
-      img.onload = () => resolve(img);
-      img.onerror = () => reject(new Error('no se pudo cargar la marca de agua'));
-      img.src = WATERMARK_MARK_URL;
-    });
-  }
-  return _watermarkImagePromise;
-}
-
-function drawWatermark(ctx, w, h, logoImg){
-  ctx.save();
-  const scale = Math.max(0.7, w / 640);
-  const logoW = logoImg.width * scale;
-  const logoH = logoImg.height * scale;
-  ctx.globalAlpha = WATERMARK_ALPHA;
-  ctx.translate(w / 2, h / 2);
-  ctx.rotate(WATERMARK_ANGLE_DEG * Math.PI / 180);
-  const diag = Math.ceil(Math.sqrt(w * w + h * h));
-  const stepX = logoW * 2.3;
-  const stepY = logoH * 3.4;
-  for (let y = -diag; y <= diag; y += stepY) {
-    for (let x = -diag; x <= diag; x += stepX) {
-      ctx.drawImage(logoImg, x - logoW / 2, y - logoH / 2, logoW, logoH);
-    }
-  }
-  ctx.restore();
-}
-
-async function resizeImageFile(file, maxDim, quality, applyWatermark){
+async function resizeImageFile(file, maxDim, quality){
   maxDim = maxDim || 640; quality = quality || 0.72;
-  if (applyWatermark === undefined) applyWatermark = true;
-  const watermarkImg = applyWatermark ? await getWatermarkImage() : null;
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = e => {
@@ -839,9 +787,6 @@ async function resizeImageFile(file, maxDim, quality, applyWatermark){
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, w, h);
         ctx.drawImage(img, 0, 0, w, h);
-        if (watermarkImg) {
-          drawWatermark(ctx, w, h, watermarkImg);
-        }
         canvas.toBlob(blob => resolve(blob), 'image/jpeg', quality);
       };
       img.onerror = () => reject(new Error('imagen inválida'));
@@ -1402,11 +1347,8 @@ const productOverlay = document.getElementById('productOverlay');
 function openProductModal(id){
   editingProductId = id;
   pendingPhoto = null;
-  mainPhotoFile = null;
   document.getElementById('productError').textContent = '';
   document.getElementById('pPhotoFile').value = '';
-  document.getElementById('pApplyWatermark').checked = true;
-  document.getElementById('watermarkToggleNote').style.display = 'none';
   renderCatFilterOptions();
 
   if (id == null) {
@@ -1508,13 +1450,10 @@ function renderGalleryList(){
       const file = e.target.files[0];
       if (!file) return;
       try {
-        const applyWatermark = document.getElementById('pApplyWatermark').checked;
-        const blob = await resizeImageFile(file, undefined, undefined, applyWatermark);
-        galleryRows[idx].file = file; // se guarda el archivo original para poder reprocesarlo luego (ver reprocessGalleryPhotos)
+        const blob = await resizeImageFile(file);
         galleryRows[idx].blob = blob;
         galleryRows[idx].previewUrl = URL.createObjectURL(blob);
         renderGalleryList();
-        updateWatermarkToggleNote();
       } catch (err) {
         document.getElementById('productError').textContent = 'No se pudo procesar una de las fotos adicionales.';
       }
@@ -1532,54 +1471,16 @@ function closeProductModal(){ productOverlay.classList.remove('open'); }
 document.getElementById('btnNewProduct').addEventListener('click', () => openProductModal(null));
 document.getElementById('btnCancelProduct').addEventListener('click', closeProductModal);
 
-let mainPhotoFile = null; // guarda el archivo original de la foto principal elegido en esta sesión, para poder reprocesarlo si se cambia la casilla
 function processMainPhoto(file){
   if (!file) return;
-  mainPhotoFile = file;
-  const applyWatermark = document.getElementById('pApplyWatermark').checked;
-  resizeImageFile(file, undefined, undefined, applyWatermark).then(blob => {
+  resizeImageFile(file).then(blob => {
     pendingPhoto = { blob, ext: 'jpg' };
     document.getElementById('pPhotoPreview').src = URL.createObjectURL(blob);
-    updateWatermarkToggleNote();
   }).catch(() => {
     document.getElementById('productError').textContent = 'No se pudo procesar la imagen.';
   });
 }
 document.getElementById('pPhotoFile').addEventListener('change', e => processMainPhoto(e.target.files[0]));
-async function reprocessGalleryPhotos(){
-  // Reprocesa las fotos de galería que ya se hayan elegido en esta sesión, usando el archivo original
-  // guardado en galleryRows[i].file (el <input type=file> se re-crea en cada renderGalleryList y pierde
-  // el archivo seleccionado, por eso no se puede leer directo del DOM).
-  const applyWatermark = document.getElementById('pApplyWatermark').checked;
-  for (let idx = 0; idx < galleryRows.length; idx++) {
-    const file = galleryRows[idx].file;
-    if (!file) continue;
-    try {
-      const blob = await resizeImageFile(file, undefined, undefined, applyWatermark);
-      galleryRows[idx].blob = blob;
-      galleryRows[idx].previewUrl = URL.createObjectURL(blob);
-    } catch (err) {
-      document.getElementById('productError').textContent = 'No se pudo procesar una de las fotos adicionales.';
-    }
-  }
-  renderGalleryList();
-}
-function updateWatermarkToggleNote(){
-  // Si la foto principal (o alguna de galería) ya estaba guardada de antes (no se seleccionó un
-  // archivo nuevo en esta sesión), no hay bytes originales para reprocesar: avisa al usuario que
-  // debe volver a elegir esa foto para que el cambio de la casilla se aplique.
-  const hasUnprocessableExisting =
-    (!mainPhotoFile && editingProductId != null && pendingPhoto !== 'REMOVE' && document.getElementById('pPhotoPreview').src && !document.getElementById('pPhotoPreview').src.startsWith('blob:')) ||
-    galleryRows.some(r => !r.file && r.url);
-  document.getElementById('watermarkToggleNote').style.display = hasUnprocessableExisting ? '' : 'none';
-}
-document.getElementById('pApplyWatermark').addEventListener('change', () => {
-  // Si ya había una foto principal y/o de galería elegidas en esta sesión, las vuelve a procesar
-  // con/sin marca de agua al instante, según el nuevo estado de la casilla.
-  if (mainPhotoFile) processMainPhoto(mainPhotoFile);
-  reprocessGalleryPhotos().then(updateWatermarkToggleNote);
-  updateWatermarkToggleNote();
-});
 document.getElementById('btnRemovePhoto').addEventListener('click', () => {
   pendingPhoto = 'REMOVE';
   const cat = document.getElementById('pCat').value;
