@@ -388,7 +388,7 @@ button:disabled{opacity:.45;cursor:not-allowed;}
         </div>
       </div>
       <div class="field checkbox-field" style="margin-top:8px;">
-        <input type="checkbox" id="pApplyWatermark" checked>
+        <input type="checkbox" id="pApplyWatermark">
         <label for="pApplyWatermark" style="margin:0;">Agregar marca de agua</label>
       </div>
       <p class="hint">🔒 Con la casilla marcada, la foto principal y todas las de la galería llevan incrustado el logo de Pandora en mosaico, para proteger tus fotos si alguien las copia. Puedes activarla o desactivarla en cualquier momento — incluso en fotos ya guardadas de antes — sin necesidad de volver a seleccionarlas ni subirlas de nuevo.</p>
@@ -576,7 +576,7 @@ let galleryRows = [];
 let mainPhotoState = null;
 // Valor de "Agregar marca de agua" cuando se abrió el modal (para saber si el
 // usuario lo cambió y por lo tanto hay que reprocesar las fotos ya guardadas).
-let initialWatermarkEnabled = true;
+let initialWatermarkEnabled = false;
 
 
 const SESSION_KEY = 'pb_cms_session';
@@ -1576,7 +1576,7 @@ function openProductModal(id){
     specsRows = [];
     wholesaleRows = [];
     galleryRows = [];
-    initialWatermarkEnabled = true;
+    initialWatermarkEnabled = false;
   } else {
     const p = products.find(x => x.id === id);
     document.getElementById('productModalTitle').textContent = 'Editar producto';
@@ -1591,7 +1591,7 @@ function openProductModal(id){
     wholesaleRows = Array.isArray(p.wholesale_tiers) ? p.wholesale_tiers.map(t => ({ label: t.label || '', price: (t.price == null ? '' : t.price) })) : [];
     galleryRows = Array.isArray(p.gallery_photos) ? p.gallery_photos.map(u => ({ state: { type: 'existing', url: u }, previewUrl: null })) : [];
     if (p.photo_url) mainPhotoState = { type: 'existing', url: p.photo_url };
-    initialWatermarkEnabled = p.watermark_enabled !== false;
+    initialWatermarkEnabled = p.watermark_enabled === true;
   }
   document.getElementById('pApplyWatermark').checked = initialWatermarkEnabled;
   renderSpecsList();
