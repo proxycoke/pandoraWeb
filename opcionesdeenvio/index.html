@@ -408,6 +408,9 @@ footer{background:#f4bad7;color:#424242;padding:44px 0 20px;margin-top:20px;}
 .envio-card .e-icon{font-size:30px;margin-bottom:12px;}
 .envio-card h4{font-size:16px;font-weight:800;margin-bottom:8px;}
 .envio-card p{font-size:13.5px;color:var(--gray);line-height:1.6;margin-bottom:6px;}
+.envio-highlight{color:#e52d80;font-weight:800;font-size:15.5px;}
+a.envio-highlight{text-decoration:none;}
+a.envio-highlight:hover{text-decoration:underline;}
 .envio-table-wrap{background:#fff;border-radius:var(--radius);box-shadow:var(--shadow);padding:24px 26px;margin-bottom:36px;}
 .envio-table-wrap h3{font-size:18px;font-weight:800;margin-bottom:14px;}
 .envio-table{width:100%;border-collapse:collapse;font-size:13.5px;}
@@ -525,25 +528,21 @@ footer{background:#f4bad7;color:#424242;padding:44px 0 20px;margin-top:20px;}
     <div class="envio-sub">Cómo recibir tus productos de Pandora Boutique, estés donde estés.</div>
   </div>
 
-  <div class="envio-draft-note">
-    📝 <strong>Nota:</strong> esta página es un borrador inicial con las modalidades de envío más comunes para este tipo de negocio en Perú. Escríbenos si necesitas ajustar zonas, costos exactos o tiempos de entrega según cómo trabajes realmente.
-  </div>
-
   <div class="envio-grid">
     <div class="envio-card">
       <div class="e-icon">🏬</div>
       <h4>Recojo en tienda</h4>
-      <p>Coordina por WhatsApp el día y la hora, y recoge tu pedido sin costo de envío.</p>
+      <p>Recoge tu pedido en nuestro almacén, <span class="envio-highlight">CERCA al Real Plaza Puruchuco - Ate y a 5 minutos del Estadio Monumental</span>. <a href="#" id="recojoWhatsapp" target="_blank" rel="noopener">Coordina aquí</a> el día y la hora por WhatsApp.</p>
     </div>
     <div class="envio-card">
       <div class="e-icon">🛵</div>
       <h4>Delivery en Lima</h4>
-      <p>Entrega a domicilio dentro de Lima Metropolitana. El costo varía según el distrito y se confirma antes de pagar.</p>
+      <p>Delivery motorizado <span class="envio-highlight" style="font-size:17.5px;">casi a todos los distritos de Lima por S/10</span>. En algunos distritos el costo puede variar: Ventanilla, Huaycán, Chosica, Lurín, M. Cáceres, Lurigancho, José Gálvez, Musa. <a class="envio-highlight" href="#" id="otrasZonasWhatsapp" target="_blank" rel="noopener">Otras zonas consulta aquí</a></p>
     </div>
     <div class="envio-card">
       <div class="e-icon">📦</div>
       <h4>Envío a nivel nacional</h4>
-      <p>Enviamos a todo el Perú mediante agencia de transporte (courier). El costo del envío lo asume el cliente y se coordina el punto de entrega más cercano.</p>
+      <p><span class="envio-highlight">Enviamos a todo el Perú mediante Shalom</span>. Si solicitas que se deje en agencia, tiene un costo adicional de S/2 (usted paga directamente a Shalom el costo que corresponda al recibirlo).</p>
     </div>
   </div>
 
@@ -552,9 +551,9 @@ footer{background:#f4bad7;color:#424242;padding:44px 0 20px;margin-top:20px;}
     <table class="envio-table">
       <thead><tr><th>Modalidad</th><th>Cobertura</th><th>Tiempo estimado</th></tr></thead>
       <tbody>
-        <tr><td>Recojo en tienda</td><td>Lima</td><td>Mismo día (con cita previa)</td></tr>
-        <tr><td>Delivery local</td><td>Lima Metropolitana</td><td>24 - 48 horas</td></tr>
-        <tr><td>Envío nacional (courier)</td><td>Todo el Perú</td><td>2 - 5 días hábiles según destino</td></tr>
+        <tr><td>Recojo en tienda</td><td>Lima</td><td>Mismo día (con cita previa, coordinar con nuestra asesora)</td></tr>
+        <tr><td>Delivery local</td><td>Lima Metropolitana</td><td>Mismo día si se coordina antes de las 9:00 am; si no, al día siguiente</td></tr>
+        <tr><td>Envío nacional (Shalom)</td><td>Todo el Perú</td><td>2 - 3 días hábiles</td></tr>
         <tr><td>Pedidos por mayor / por cajón</td><td>Lima y provincias</td><td>Coordinado según volumen del pedido</td></tr>
       </tbody>
     </table>
@@ -876,9 +875,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("year").textContent = new Date().getFullYear();
 
   const waLink = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent("¡Hola Pandora Boutique! Tengo una consulta sobre el envío de mi pedido.")}`;
+  const waRecojoLink = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent("¡Hola Pandora Boutique! Quisiera coordinar el recojo de mi pedido en tienda.")}`;
+  const waZonasLink = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent("¡Hola Pandora Boutique! Quisiera consultar el costo de delivery para mi distrito.")}`;
   document.getElementById("waFloat").href = waLink;
   document.getElementById("bnWhatsapp").href = waLink;
   document.getElementById("ctaWhatsapp").href = waLink;
+  document.getElementById("recojoWhatsapp").href = waRecojoLink;
+  document.getElementById("otrasZonasWhatsapp").href = waZonasLink;
 
   try {
     await loadCatalog();

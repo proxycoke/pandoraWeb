@@ -1035,6 +1035,7 @@ function renderDetail(slug) {
   document.getElementById("viewGrid").style.display = "none";
   document.getElementById("viewDetail").style.display = "";
   document.getElementById("viewProduct").style.display = "none";
+  document.getElementById("backToGrid").style.display = cat ? "" : "none";
 
   if (!cat) {
     document.getElementById("detailTitle").textContent = "";
@@ -1196,7 +1197,7 @@ function renderProductDetail(catSlug, productParam) {
 
   wrap.innerHTML = `
     <div class="breadcrumb">
-      <a href="../" id="pdHomeLink">Inicio</a> / <a href="./" id="pdGridLink">Categorías</a> / <a href="#" id="pdCatLink">${cat ? escapeHtml(cat.name) : "Categoría"}</a> / ${escapeHtml(p.name)}
+      <a href="/" id="pdHomeLink">Inicio</a> / <a href="./" id="pdGridLink">Categorías</a> / <a href="#" id="pdCatLink">${cat ? escapeHtml(cat.name) : "Categoría"}</a> / ${escapeHtml(p.name)}
     </div>
     <div class="product-main">
       <div class="gallery">
@@ -1233,7 +1234,7 @@ function renderProductDetail(catSlug, productParam) {
           </div>
           <div class="info-box">
             <div class="ib-icon">🚚</div>
-            <div><h5>Envío a nivel nacional</h5><p>Delivery en Lima o envío por courier a todo el Perú. Costo y tiempo se confirman antes de pagar. <a href="../opcionesdeenvio/">Ver opciones de envío →</a></p></div>
+            <div><h5>Envío a nivel nacional</h5><p>Delivery en Lima o envío por courier a todo el Perú. Costo y tiempo se confirman antes de pagar. <a href="/opcionesdeenvio/">Ver opciones de envío →</a></p></div>
           </div>
         </div>
       </div>
