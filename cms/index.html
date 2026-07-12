@@ -177,8 +177,20 @@ button:disabled{opacity:.45;cursor:not-allowed;}
 }
 .icon-opt:hover{background:#fde2ee;}
 .icon-opt.selected{border-color:var(--pink-dark);background:#fde2ee;}
-.status-pill{font-size:12px;background:#dcfce7;color:#166534;padding:5px 12px;border-radius:20px;font-weight:700;}
+.status-pill{font-size:12px;background:#dcfce7;color:#166534;padding:5px 12px;border-radius:20px;font-weight:700;white-space:nowrap;}
 .status-pill.danger{background:#fee2e2;color:#b91c1c;}
+.import-status-block{
+  display:block;font-size:12px;font-weight:600;line-height:1.5;padding:6px 10px;border-radius:8px;
+  white-space:normal;word-break:break-word;
+}
+.import-status-block.error{background:#fee2e2;color:#b91c1c;}
+.import-status-block.warning{background:#fef3c7;color:#92400e;}
+.import-status-block div{margin-bottom:2px;}
+.import-status-block div:last-child{margin-bottom:0;}
+.import-photos-options{display:flex;flex-direction:column;gap:10px;}
+.import-photos-option{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:10px 12px;}
+.import-photos-option-label{display:block;font-size:12px;font-weight:700;color:var(--black);margin-bottom:6px;}
+.import-photos-option input[type=file]{font-size:12.5px;max-width:100%;}
 .empty-msg{text-align:center;color:var(--gray);padding:40px 0;}
 .import-box{
   max-width:640px;margin:0 auto 24px;padding:20px 24px;background:#fff;border-radius:var(--radius);
@@ -313,9 +325,19 @@ button:disabled{opacity:.45;cursor:not-allowed;}
             <input type="file" id="importExcelFile" accept=".xlsx,.xls">
           </div>
           <div class="field">
-            <label>Carpeta con las fotos de estos productos (opcional, pero recomendado)</label>
-            <input type="file" id="importPhotosFolder" webkitdirectory directory multiple>
-            <p class="hint">Selecciona la carpeta completa donde tienes guardadas las fotos nuevas. El sistema busca cada foto por su nombre de archivo, tal como lo escribiste en el Excel.</p>
+            <label>Fotos de estos productos (opcional, pero recomendado)</label>
+            <div class="import-photos-options">
+              <div class="import-photos-option">
+                <span class="import-photos-option-label">📁 Opción A: elegir la carpeta completa</span>
+                <input type="file" id="importPhotosFolder" webkitdirectory directory multiple>
+              </div>
+              <div class="import-photos-option">
+                <span class="import-photos-option-label">🖼️ Opción B: o elegir varias imágenes sueltas</span>
+                <input type="file" id="importPhotosFiles" accept="image/*" multiple>
+              </div>
+            </div>
+            <p class="hint" id="importPhotosSelectedHint">Aún no se ha elegido ninguna foto.</p>
+            <p class="hint">Usa la Opción A si tienes todas las fotos nuevas juntas en una sola carpeta, o la Opción B si prefieres elegirlas una por una (puedes seleccionar varias a la vez). El sistema busca cada foto por su nombre de archivo, tal como lo escribiste en el Excel.</p>
             <p class="hint">📐 Medida recomendada: fotos <strong>cuadradas</strong> (mismo ancho que alto), de al menos <strong>640 x 640 px</strong>. Si alguna foto no es cuadrada, se recorta automáticamente para llenar el espacio — para que se vea completa y nítida, usa fotos cuadradas con lo más importante centrado.</p>
           </div>
           <button class="btn-primary" id="btnAnalyzeImport">Analizar archivo</button>
@@ -1037,11 +1059,27 @@ function downloadImportTemplate(){
 }
 document.getElementById('btnDownloadTemplate').addEventListener('click', downloadImportTemplate);
 
+function updateImportPhotosHint(){
+  const count = Object.keys(importPhotoFiles).length;
+  document.getElementById('importPhotosSelectedHint').textContent = count
+    ? `✅ ${count} foto${count === 1 ? '' : 's'} seleccionada${count === 1 ? '' : 's'}.`
+    : 'Aún no se ha elegido ninguna foto.';
+}
 document.getElementById('importPhotosFolder').addEventListener('change', (e) => {
   importPhotoFiles = {};
   Array.from(e.target.files).forEach(file => {
     importPhotoFiles[file.name.toLowerCase()] = file;
   });
+  document.getElementById('importPhotosFiles').value = '';
+  updateImportPhotosHint();
+});
+document.getElementById('importPhotosFiles').addEventListener('change', (e) => {
+  importPhotoFiles = {};
+  Array.from(e.target.files).forEach(file => {
+    importPhotoFiles[file.name.toLowerCase()] = file;
+  });
+  document.getElementById('importPhotosFolder').value = '';
+  updateImportPhotosHint();
 });
 
 async function analyzeImportFile(){
@@ -1122,8 +1160,8 @@ function renderImportPreview(){
 
   body.innerHTML = importAnalyzedRows.map(r => {
     let statusHtml;
-    if (r.errors.length) statusHtml = `<span class="sold-badge" title="${escapeHtml(r.errors.join(' · '))}">❌ ${escapeHtml(r.errors.join(', '))}</span>`;
-    else if (r.warnings.length) statusHtml = `<span class="status-pill danger" title="${escapeHtml(r.warnings.join(' · '))}">⚠️ ${escapeHtml(r.warnings.join(', '))}</span>`;
+    if (r.errors.length) statusHtml = `<div class="import-status-block error">${r.errors.map(e => `<div>❌ ${escapeHtml(e)}</div>`).join('')}</div>`;
+    else if (r.warnings.length) statusHtml = `<div class="import-status-block warning">${r.warnings.map(w => `<div>⚠️ ${escapeHtml(w)}</div>`).join('')}</div>`;
     else statusHtml = `<span class="status-pill">✅ Listo</span>`;
     return `<tr>
       <td>${r.rowNum}</td>
@@ -1131,7 +1169,7 @@ function renderImportPreview(){
       <td>${escapeHtml(r.name)}</td>
       <td>${isNaN(r.price) ? '—' : 'S/ ' + r.price.toFixed(2)}</td>
       <td style="font-size:12px;color:var(--gray);">${escapeHtml(r.mainPhotoName || '—')}</td>
-      <td style="font-size:12px;">${statusHtml}</td>
+      <td style="min-width:220px;">${statusHtml}</td>
     </tr>`;
   }).join('');
 
