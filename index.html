@@ -222,11 +222,15 @@ nav.cat-nav{
 .trust-card .t-icon{font-size:26px;margin-bottom:8px;}
 .trust-card h4{font-size:13.5px;font-weight:800;margin-bottom:4px;}
 .trust-card p{font-size:12px;color:var(--gray);}
-#trustWhatsapp{transition:background-color .2s ease,color .2s ease;}
-#trustWhatsapp:hover,#trustWhatsapp:active,#trustWhatsapp:focus-visible{background:#25D366;color:#fff;}
+#trustWhatsapp,#trustEnvios{transition:background-color .2s ease,color .2s ease;}
+#trustWhatsapp:hover,#trustWhatsapp:active,#trustWhatsapp:focus-visible,
+#trustEnvios:hover,#trustEnvios:active,#trustEnvios:focus-visible{background:#25D366;color:#fff;}
 #trustWhatsapp:hover .t-icon,#trustWhatsapp:active .t-icon,#trustWhatsapp:focus-visible .t-icon,
 #trustWhatsapp:hover h4,#trustWhatsapp:active h4,#trustWhatsapp:focus-visible h4,
-#trustWhatsapp:hover p,#trustWhatsapp:active p,#trustWhatsapp:focus-visible p{color:#fff;}
+#trustWhatsapp:hover p,#trustWhatsapp:active p,#trustWhatsapp:focus-visible p,
+#trustEnvios:hover .t-icon,#trustEnvios:active .t-icon,#trustEnvios:focus-visible .t-icon,
+#trustEnvios:hover h4,#trustEnvios:active h4,#trustEnvios:focus-visible h4,
+#trustEnvios:hover p,#trustEnvios:active p,#trustEnvios:focus-visible p{color:#fff;}
 
 
 .filter-bar{
@@ -517,7 +521,7 @@ footer{background:#f4bad7;color:#424242;padding:44px 0 20px;margin-top:20px;}
 <section class="container">
   <div class="trust-grid">
     <div class="trust-card"><div class="t-icon">🛍️</div><h4>VENTA POR MAYOR Y MENOR</h4><p>Precios especiales desde 3, 6 o 12 unidades</p></div>
-    <a class="trust-card" href="opcionesdeenvio/" style="display:block;color:inherit;"><div class="t-icon">🚚</div><h4>ENVÍOS A NIVEL NACIONAL</h4><p>Ver opciones de envío →</p></a>
+    <a class="trust-card" id="trustEnvios" href="opcionesdeenvio/" style="display:block;color:inherit;"><div class="t-icon">🚚</div><h4>ENVÍOS A NIVEL NACIONAL</h4><p>Ver opciones de envío →</p></a>
     <div class="trust-card"><div class="t-icon">✅</div><h4>PRODUCTOS DE CALIDAD</h4><p>Seleccionados para decorar y sorprender</p></div>
     <a class="trust-card" id="trustWhatsapp" href="#" target="_blank" rel="noopener" style="display:block;color:inherit;"><div class="t-icon">💬</div><h4>ATENCIÓN POR WHATSAPP</h4><p>Resolvemos tus dudas al instante</p></a>
   </div>
