@@ -38,6 +38,20 @@
   ]
 }
 </script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  "name": "Pandora Import",
+  "url": "https://pandoraimport.com/",
+  "logo": "https://pandoraimport.com/assets/img/logo.png",
+  "sameAs": [
+    "https://www.facebook.com/pandoraboutiqueymas",
+    "https://www.instagram.com/pandoraboutiqueymas/",
+    "https://www.tiktok.com/@pandoraboutiquenovedades"
+  ]
+}
+</script>
 <style>
 
 :root{
@@ -523,6 +537,7 @@ footer{background:#f4bad7;color:#424242;padding:44px 0 20px;margin-top:20px;}
   scroll-snap-align:start;
   flex:0 0 180px;background:#fff;border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow);
   cursor:pointer;transition:box-shadow .2s,transform .2s;
+  display:block;-webkit-user-drag:none;user-select:none;
 }
 .similar-card:hover{box-shadow:var(--shadow-lg);transform:translateY(-3px);}
 .similar-card .simg-wrap{position:relative;aspect-ratio:1/1;background:#f1f1f1;overflow:hidden;}
@@ -642,7 +657,7 @@ footer{background:#f4bad7;color:#424242;padding:44px 0 20px;margin-top:20px;}
 <section class="container" style="margin-top:10px;">
   <div id="viewGrid">
     <div class="cat-page-header">
-      <h1 class="cat-page-title">Todas las categorías</h1>
+      <h1 class="cat-page-title" id="gridTitle">Todas las categorías</h1>
       <div class="cat-page-sub">Elige una categoría para ver todos sus productos.</div>
     </div>
     <div class="cat-grid-full" id="catGridFull"><p style="grid-column:1/-1;text-align:center;color:var(--gray);padding:30px 0;">Cargando categorías...</p></div>
@@ -874,6 +889,12 @@ function slugify(name) {
     .replace(/[^a-z0-9]+/g, "-").replace(/(^-+|-+$)/g, "") || "producto";
 }
 function productSlug(p) { return slugify(p.name) + "-" + p.id; }
+// true si es un click normal (sin ctrl/cmd/shift/alt ni botón central) — así
+// dejamos que el navegador maneje "abrir en pestaña nueva" de forma nativa
+// en vez de interceptarlo siempre con preventDefault.
+function isPlainLeftClick(e) {
+  return e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey;
+}
 function parseProductIdFromSlug(seg) {
   if (!seg) return null;
   const m = String(seg).match(/-(\d+)$/);
@@ -1031,10 +1052,29 @@ function renderCatNav() {
   });
 }
 
+// Garantiza que en el DOM crudo solo exista un <h1> real a la vez (el de la
+// vista actualmente visible); las otras vistas usan <div> equivalente para
+// evitar múltiples <h1> simultáneos aunque estén ocultos con display:none.
+function setHeadingTag(id, asH1) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const wantTag = asH1 ? "h1" : "div";
+  if (el.tagName.toLowerCase() === wantTag) return;
+  const newEl = document.createElement(wantTag);
+  newEl.id = el.id;
+  newEl.className = el.className;
+  newEl.innerHTML = el.innerHTML;
+  if (!asH1) newEl.setAttribute("aria-hidden", "true");
+  el.replaceWith(newEl);
+}
+
 function renderGrid() {
   document.getElementById("viewGrid").style.display = "";
   document.getElementById("viewDetail").style.display = "none";
   document.getElementById("viewProduct").style.display = "none";
+  setHeadingTag("gridTitle", true);
+  setHeadingTag("detailTitle", false);
+  document.getElementById("productDetailWrap").innerHTML = "";
   updateSeoMeta({
     title: "Categorías | Pandora Boutique",
     description: "Explora todas las categorías de Pandora Boutique: velas LED, luces, candelabros, estrellas decorativas y artículos de organización.",
@@ -1058,14 +1098,18 @@ function renderGrid() {
   grid.innerHTML = cats.map(c => {
     const count = PRODUCTS.filter(p => p.catId === c.id).length;
     return `
-    <div class="cat-card-full" data-cat="${c.id}">
+    <a href="/categorias/${c.id}" class="cat-card-full" data-cat="${c.id}">
       <div class="cat-icon-full" style="background:${c.color}">${c.icon}</div>
       <h4>${c.name}</h4>
       <div class="cat-count-label">${count} producto${count === 1 ? "" : "s"}</div>
-    </div>`;
+    </a>`;
   }).join("");
   grid.querySelectorAll(".cat-card-full").forEach(el => {
-    el.addEventListener("click", () => goToCategory(el.dataset.cat));
+    el.addEventListener("click", (e) => {
+      if (!isPlainLeftClick(e)) return;
+      e.preventDefault();
+      goToCategory(el.dataset.cat);
+    });
   });
 }
 
@@ -1075,6 +1119,9 @@ function renderDetail(slug) {
   document.getElementById("viewDetail").style.display = "";
   document.getElementById("viewProduct").style.display = "none";
   document.getElementById("backToGrid").style.display = cat ? "" : "none";
+  setHeadingTag("gridTitle", false);
+  setHeadingTag("detailTitle", true);
+  document.getElementById("productDetailWrap").innerHTML = "";
 
   if (!cat) {
     document.getElementById("detailTitle").textContent = "";
@@ -1125,7 +1172,7 @@ function renderDetail(slug) {
   }
 
   grid.innerHTML = list.map(p => `
-    <div class="product-card" data-id="${p.id}" style="cursor:pointer;">
+    <a href="/categorias/${slug}/${productSlug(p)}" class="product-card" data-id="${p.id}">
       <div class="product-img-wrap">
         <img src="${p.img}" alt="${escapeHtml(p.name)}">
         ${p.sold ? `<div class="badge-sold">Agotado</div>` : ""}
@@ -1141,17 +1188,19 @@ function renderDetail(slug) {
           ${p.sold ? "No disponible" : "🛒 Añadir al carrito"}
         </button>
       </div>
-    </div>`).join("");
+    </a>`).join("");
 
   grid.querySelectorAll(".product-card").forEach(card => {
     card.addEventListener("click", (e) => {
       if (e.target.closest(".add-btn")) return;
+      if (!isPlainLeftClick(e)) return;
+      e.preventDefault();
       const p = PRODUCTS.find(x => x.id === Number(card.dataset.id));
       if (p) goToProduct(slug, p);
     });
   });
   grid.querySelectorAll(".add-btn:not(:disabled)").forEach(btn => {
-    btn.addEventListener("click", (e) => { e.stopPropagation(); addToCart(Number(btn.dataset.id)); });
+    btn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); addToCart(Number(btn.dataset.id)); });
   });
 }
 
@@ -1161,6 +1210,8 @@ function renderProductDetail(catSlug, productParam) {
   document.getElementById("viewGrid").style.display = "none";
   document.getElementById("viewDetail").style.display = "none";
   document.getElementById("viewProduct").style.display = "";
+  setHeadingTag("gridTitle", false);
+  setHeadingTag("detailTitle", false);
 
   const productId = typeof productParam === "number" ? productParam : parseProductIdFromSlug(productParam);
   const p = PRODUCTS.find(x => x.id === productId);
@@ -1241,7 +1292,7 @@ function renderProductDetail(catSlug, productParam) {
     <div class="product-main">
       <div class="gallery">
         <div class="thumb-col" id="pdThumbCol">
-          ${images.map((img, i) => `<div class="thumb ${i === 0 ? "active" : ""}" data-img="${i}"><img src="${img}" alt=""></div>`).join("")}
+          ${images.map((img, i) => `<div class="thumb ${i === 0 ? "active" : ""}" data-img="${i}"><img src="${img}" alt="${escapeHtml(p.name)} - foto ${i + 1}"></div>`).join("")}
         </div>
         <div class="main-image-wrap"><img id="pdMainImage" src="${images[0]}" alt="${escapeHtml(p.name)}"></div>
       </div>
@@ -1382,7 +1433,7 @@ function renderSimilarProducts(p) {
   section.style.display = "";
 
   track.innerHTML = similar.map(sp => `
-    <div class="similar-card" data-id="${sp.id}">
+    <a href="/categorias/${sp.catId}/${productSlug(sp)}" class="similar-card" data-id="${sp.id}">
       <div class="simg-wrap">
         <img src="${sp.img}" alt="${escapeHtml(sp.name)}" loading="lazy">
         ${sp.sold ? `<div class="sbadge-sold">Agotado</div>` : ""}
@@ -1391,10 +1442,12 @@ function renderSimilarProducts(p) {
         <span class="sname">${escapeHtml(sp.name)}</span>
         <span class="sprice">S/ ${sp.price.toFixed(2)}</span>
       </div>
-    </div>`).join("");
+    </a>`).join("");
 
   track.querySelectorAll(".similar-card").forEach(card => {
-    card.addEventListener("click", () => {
+    card.addEventListener("click", (e) => {
+      if (!isPlainLeftClick(e)) return;
+      e.preventDefault();
       const sp = similar.find(x => x.id === Number(card.dataset.id));
       if (sp) goToProduct(sp.catId, sp);
     });

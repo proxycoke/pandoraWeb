@@ -244,6 +244,7 @@ button:disabled{opacity:.45;cursor:not-allowed;}
       <button class="tab-btn" data-tab="carrusel">🎠 Carrusel</button>
       <button class="tab-btn" data-tab="mantenimiento">🚧 Mantenimiento</button>
       <button class="tab-btn" data-tab="importacion">📦 Importación masiva</button>
+      <button class="tab-btn" data-tab="seo">🔍 SEO</button>
     </div>
 
     
@@ -375,6 +376,29 @@ button:disabled{opacity:.45;cursor:not-allowed;}
             <p id="importResultText" style="font-weight:700;"></p>
             <button class="btn-outline" id="btnViewImported">Ver estos productos</button>
             <button class="btn-danger" id="btnUndoImport">Deshacer esta importación</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+
+    <section id="tab-seo" style="display:none;">
+      <div class="import-box" style="display:block;">
+        <h4 style="margin-top:0;">Sitemap.xml</h4>
+        <p class="hint">
+          El sitemap.xml le indica a Google qué páginas existen en la tienda. Genera aquí una versión actualizada
+          — incluye la portada, todas las categorías y <strong>todos los productos actuales</strong> — cada vez que
+          agregues o quites productos o categorías. Luego descárgalo y súbelo (reemplazando el archivo
+          <code>sitemap.xml</code> actual) en el mismo push que hagas a producción.
+        </p>
+        <button class="btn-primary" id="btnGenerateSitemap">🔄 Generar sitemap.xml actualizado</button>
+        <p class="hint" id="sitemapStatus"></p>
+        <div class="field" id="sitemapResultWrap" style="display:none;margin-top:14px;">
+          <label>Contenido de sitemap.xml (<span id="sitemapUrlCount">0</span> URLs)</label>
+          <textarea id="sitemapOutput" rows="14" readonly style="font-family:monospace;font-size:12px;"></textarea>
+          <div style="margin-top:10px;">
+            <button class="btn-outline" id="btnCopySitemap">📋 Copiar</button>
+            <button class="btn-outline" id="btnDownloadSitemap">⬇️ Descargar sitemap.xml</button>
           </div>
         </div>
       </div>
@@ -912,10 +936,72 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     document.getElementById('tab-carrusel').style.display = btn.dataset.tab === 'carrusel' ? 'block' : 'none';
     document.getElementById('tab-mantenimiento').style.display = btn.dataset.tab === 'mantenimiento' ? 'block' : 'none';
     document.getElementById('tab-importacion').style.display = btn.dataset.tab === 'importacion' ? 'block' : 'none';
+    document.getElementById('tab-seo').style.display = btn.dataset.tab === 'seo' ? 'block' : 'none';
     localStorage.setItem(ACTIVE_TAB_KEY, btn.dataset.tab);
     if (leavingImportTab && !suppressImportReset) resetImportForm();
     suppressImportReset = false;
   });
+});
+
+
+// ---- Generador de sitemap.xml ----
+// Se arma en el momento a partir de "categories"/"products" ya cargados desde
+// Supabase, así que siempre refleja el catálogo real — no hace falta tocar
+// este código cuando se agregan o quitan productos o categorías, solo volver
+// a generar el archivo desde esta pestaña.
+const SITE_ORIGIN_SEO = "https://pandoraimport.com";
+function buildSitemapXml() {
+  const urls = [];
+  urls.push({ loc: SITE_ORIGIN_SEO + "/", changefreq: "weekly", priority: "1.0" });
+  urls.push({ loc: SITE_ORIGIN_SEO + "/categorias/", changefreq: "weekly", priority: "0.9" });
+  categories.forEach(c => {
+    urls.push({ loc: SITE_ORIGIN_SEO + "/categorias/" + c.id, changefreq: "weekly", priority: "0.8" });
+  });
+  products.forEach(p => {
+    const cat = categories.find(c => c.id === p.category_id);
+    if (!cat) return; // producto sin categoría válida — no debería pasar, pero por seguridad lo omitimos
+    const slug = slugify(p.name) + "-" + p.id;
+    urls.push({ loc: SITE_ORIGIN_SEO + "/categorias/" + p.category_id + "/" + slug, changefreq: "weekly", priority: "0.6" });
+  });
+  urls.push({ loc: SITE_ORIGIN_SEO + "/opcionesdeenvio/", changefreq: "monthly", priority: "0.5" });
+
+  const body = urls.map(u =>
+    `  <url>\n    <loc>${u.loc}</loc>\n    <changefreq>${u.changefreq}</changefreq>\n    <priority>${u.priority}</priority>\n  </url>`
+  ).join("\n");
+  return { xml: `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${body}\n</urlset>\n`, count: urls.length };
+}
+
+document.getElementById('btnGenerateSitemap').addEventListener('click', () => {
+  const { xml, count } = buildSitemapXml();
+  document.getElementById('sitemapOutput').value = xml;
+  document.getElementById('sitemapUrlCount').textContent = count;
+  document.getElementById('sitemapResultWrap').style.display = 'block';
+  document.getElementById('sitemapStatus').textContent = `Generado con ${products.length} productos y ${categories.length} categorías.`;
+});
+
+document.getElementById('btnCopySitemap').addEventListener('click', async () => {
+  const text = document.getElementById('sitemapOutput').value;
+  try {
+    await navigator.clipboard.writeText(text);
+    document.getElementById('sitemapStatus').textContent = '✅ Copiado al portapapeles.';
+  } catch (err) {
+    document.getElementById('sitemapOutput').select();
+    document.execCommand('copy');
+    document.getElementById('sitemapStatus').textContent = '✅ Copiado al portapapeles.';
+  }
+});
+
+document.getElementById('btnDownloadSitemap').addEventListener('click', () => {
+  const text = document.getElementById('sitemapOutput').value;
+  const blob = new Blob([text], { type: 'application/xml' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'sitemap.xml';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 });
 
 

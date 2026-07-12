@@ -47,6 +47,36 @@
   ]
 }
 </script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  "name": "Pandora Import",
+  "url": "https://pandoraimport.com/",
+  "logo": "https://pandoraimport.com/assets/img/logo.png",
+  "sameAs": [
+    "https://www.facebook.com/pandoraboutiqueymas",
+    "https://www.instagram.com/pandoraboutiqueymas/",
+    "https://www.tiktok.com/@pandoraboutiquenovedades"
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  "name": "Pandora Import",
+  "url": "https://pandoraimport.com/",
+  "potentialAction": {
+    "@type": "SearchAction",
+    "target": {
+      "@type": "EntryPoint",
+      "urlTemplate": "https://pandoraimport.com/?buscar={search_term_string}"
+    },
+    "query-input": "required name=search_term_string"
+  }
+}
+</script>
 <style>
 :root{
   --bg:#fff3f8;
@@ -770,6 +800,12 @@ function slugify(name) {
 }
 function productSlug(p) { return slugify(p.name) + "-" + p.id; }
 function productUrl(p) { return "categorias/" + p.catId + "/" + productSlug(p); }
+// true si es un click normal (sin ctrl/cmd/shift/alt ni botón central) — así
+// dejamos que el navegador maneje "abrir en pestaña nueva" de forma nativa
+// en vez de interceptarlo siempre con preventDefault.
+function isPlainLeftClick(e) {
+  return e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey;
+}
 
 
 function placeholderImage(catId, text) {
@@ -847,12 +883,16 @@ function renderCatNav() {
 function renderCatGrid() {
   const grid = document.getElementById("catGrid");
   grid.innerHTML = CATEGORIES.map(c => `
-    <div class="cat-card" data-cat="${c.id}">
+    <a href="categorias/${c.id}" class="cat-card" data-cat="${c.id}">
       <div class="cat-icon" style="background:${c.color}">${c.icon}</div>
       <span>${c.name}</span>
-    </div>`).join("");
+    </a>`).join("");
   grid.querySelectorAll(".cat-card").forEach(el => {
-    el.addEventListener("click", () => setCategory(el.dataset.cat));
+    el.addEventListener("click", (e) => {
+      if (!isPlainLeftClick(e)) return;
+      e.preventDefault();
+      setCategory(el.dataset.cat);
+    });
   });
 }
 
@@ -894,7 +934,7 @@ function renderProducts() {
   grid.innerHTML = list.map(p => {
     const cat = catById[p.catId];
     return `
-    <div class="product-card" data-id="${p.id}" style="cursor:pointer;">
+    <a href="${productUrl(p)}" class="product-card" data-id="${p.id}">
       <div class="product-img-wrap">
         <img src="${p.img}" alt="${escapeHtml(p.name)}">
         ${p.sold ? `<div class="badge-sold">Agotado</div>` : ""}
@@ -910,18 +950,14 @@ function renderProducts() {
           ${p.sold ? "No disponible" : "🛒 Añadir al carrito"}
         </button>
       </div>
-    </div>`;
+    </a>`;
   }).join("");
 
-  grid.querySelectorAll(".product-card").forEach(card => {
-    card.addEventListener("click", (e) => {
-      if (e.target.closest(".add-btn")) return;
-      const p = PRODUCTS.find(x => x.id === Number(card.dataset.id));
-      if (p) window.location.href = productUrl(p);
-    });
-  });
+  // La navegación al producto ya la resuelve el href nativo del <a> (incluye
+  // ctrl/cmd/click-central para abrir en pestaña nueva); solo hace falta
+  // evitar que el botón "Añadir al carrito" dispare esa navegación.
   grid.querySelectorAll(".add-btn:not(:disabled)").forEach(btn => {
-    btn.addEventListener("click", (e) => { e.stopPropagation(); addToCart(Number(btn.dataset.id)); });
+    btn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); addToCart(Number(btn.dataset.id)); });
   });
 }
 
