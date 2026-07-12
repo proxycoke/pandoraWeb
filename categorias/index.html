@@ -71,7 +71,7 @@ img{max-width:100%;display:block;}
 a{text-decoration:none;color:inherit;}
 button{font-family:inherit;cursor:pointer;border:none;background:none;}
 ul{list-style:none;}
-.container{max-width:1280px;margin:0 auto;padding:0 20px;}
+.container{width:100%;max-width:1280px;margin:0 auto;padding:0 20px;min-width:0;}
 
 
 .topbar{
@@ -509,6 +509,43 @@ footer{background:#f4bad7;color:#424242;padding:44px 0 20px;margin-top:20px;}
   .gallery{flex-direction:column-reverse;}
   .thumb-col{flex-direction:row;width:100%;overflow-x:auto;}
   .thumb{width:64px;flex-shrink:0;}
+}
+
+.similar-products{padding:6px 0 40px;}
+.similar-products h3{font-size:19px;font-weight:800;margin-bottom:18px;}
+.similar-carousel-wrap{position:relative;padding:0 8px;}
+.similar-track{
+  display:flex;gap:14px;overflow:hidden;transition:transform .3s ease;
+}
+.similar-card{
+  flex:0 0 180px;background:#fff;border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow);
+  cursor:pointer;transition:box-shadow .2s,transform .2s;
+}
+.similar-card:hover{box-shadow:var(--shadow-lg);transform:translateY(-3px);}
+.similar-card .simg-wrap{position:relative;aspect-ratio:1/1;background:#f1f1f1;overflow:hidden;}
+.similar-card .simg-wrap img{width:100%;height:100%;object-fit:cover;}
+.similar-card .sbadge-sold{
+  position:absolute;inset:0;background:rgba(255,255,255,.72);display:flex;align-items:center;justify-content:center;
+  font-weight:800;color:var(--black);font-size:12px;letter-spacing:.5px;text-transform:uppercase;
+}
+.similar-card .sinfo{padding:10px 12px 12px;}
+.similar-card .sname{font-size:12.5px;font-weight:600;line-height:1.3;min-height:32px;display:block;margin-bottom:4px;}
+.similar-card .sprice{font-size:14.5px;font-weight:800;color:var(--green);}
+.similar-arrow{
+  position:absolute;top:calc(50% - 20px);transform:translateY(-50%);z-index:2;
+  background:rgba(255,255,255,.92);width:34px;height:34px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;box-shadow:var(--shadow);
+}
+.similar-arrow.left{left:-14px;}
+.similar-arrow.right{right:-14px;}
+.similar-arrow.is-hidden{display:none;}
+@media (max-width:680px){
+  .similar-card{flex:0 0 130px;}
+  .similar-card .sname{font-size:11.5px;min-height:28px;}
+  .similar-card .sprice{font-size:13px;}
+  .similar-arrow{width:28px;height:28px;}
+  .similar-arrow.left{left:-6px;}
+  .similar-arrow.right{right:-6px;}
 }
 
 .maintenance-screen{
@@ -1266,6 +1303,15 @@ function renderProductDetail(catSlug, productParam) {
         </table>
       </div>` : ""}
     </div>
+
+    <div class="similar-products" id="similarProductsSection" style="display:none;">
+      <h3>Más opciones similares</h3>
+      <div class="similar-carousel-wrap">
+        <button class="similar-arrow left" id="similarPrev" aria-label="Ver anterior"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M15 4l-8 8 8 8" fill="none" stroke="#111" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        <div class="similar-track" id="similarTrack"></div>
+        <button class="similar-arrow right" id="similarNext" aria-label="Ver siguiente"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M9 4l8 8-8 8" fill="none" stroke="#111" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      </div>
+    </div>
   `;
 
   
@@ -1306,6 +1352,97 @@ function renderProductDetail(catSlug, productParam) {
   
   document.getElementById("pdGridLink").addEventListener("click", goToGridView);
   document.getElementById("pdCatLink").addEventListener("click", (e) => { e.preventDefault(); goToCategory(p.catId); });
+
+  renderSimilarProducts(p);
+}
+
+// Carrusel "Más opciones similares": muestra el resto de productos de la
+// misma categoría que el que se está viendo. Es circular — al llegar al
+// final, "siguiente" vuelve a mostrar el primer producto, y viceversa.
+let similarCarouselState = null;
+function renderSimilarProducts(p) {
+  const section = document.getElementById("similarProductsSection");
+  const track = document.getElementById("similarTrack");
+  const prevBtn = document.getElementById("similarPrev");
+  const nextBtn = document.getElementById("similarNext");
+
+  if (similarCarouselState) {
+    window.removeEventListener("resize", similarCarouselState.onResize);
+    similarCarouselState = null;
+  }
+
+  const similar = PRODUCTS.filter(x => x.catId === p.catId && x.id !== p.id);
+
+  if (similar.length === 0) {
+    section.style.display = "none";
+    return;
+  }
+  section.style.display = "";
+
+  track.innerHTML = similar.map(sp => `
+    <div class="similar-card" data-id="${sp.id}">
+      <div class="simg-wrap">
+        <img src="${sp.img}" alt="${escapeHtml(sp.name)}" loading="lazy">
+        ${sp.sold ? `<div class="sbadge-sold">Agotado</div>` : ""}
+      </div>
+      <div class="sinfo">
+        <span class="sname">${escapeHtml(sp.name)}</span>
+        <span class="sprice">S/ ${sp.price.toFixed(2)}</span>
+      </div>
+    </div>`).join("");
+
+  track.querySelectorAll(".similar-card").forEach(card => {
+    card.addEventListener("click", () => {
+      const sp = similar.find(x => x.id === Number(card.dataset.id));
+      if (sp) goToProduct(sp.catId, sp);
+    });
+  });
+
+  let index = 0;
+
+  function visibleCount() {
+    const wrapEl = track;
+    const card = wrapEl.querySelector(".similar-card");
+    if (!card) return 1;
+    const cardWidth = card.getBoundingClientRect().width;
+    const gap = 14;
+    const trackWidth = wrapEl.getBoundingClientRect().width;
+    return Math.max(1, Math.floor((trackWidth + gap) / (cardWidth + gap)));
+  }
+
+  function maxIndex() {
+    return Math.max(0, similar.length - visibleCount());
+  }
+
+  function update() {
+    const vc = visibleCount();
+    const showArrows = similar.length > vc;
+    prevBtn.classList.toggle("is-hidden", !showArrows);
+    nextBtn.classList.toggle("is-hidden", !showArrows);
+    const card = track.querySelector(".similar-card");
+    if (!card) return;
+    const cardWidth = card.getBoundingClientRect().width;
+    const gap = 14;
+    track.style.transform = `translateX(${-index * (cardWidth + gap)}px)`;
+  }
+
+  prevBtn.addEventListener("click", () => {
+    index = index <= 0 ? maxIndex() : index - 1;
+    update();
+  });
+  nextBtn.addEventListener("click", () => {
+    index = index >= maxIndex() ? 0 : index + 1;
+    update();
+  });
+
+  const onResize = () => {
+    index = Math.min(index, maxIndex());
+    update();
+  };
+  window.addEventListener("resize", onResize);
+  similarCarouselState = { onResize };
+
+  update();
 }
 
 
