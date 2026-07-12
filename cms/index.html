@@ -822,7 +822,12 @@ async function resizeImageFile(file, maxDim, quality){
 // dibujándolo nosotros mismos en el canvas (mismo mosaico ya validado antes).
 const WATERMARK_MARK_URL = '../assets/img/watermark-mark.png';
 const WATERMARK_ANGLE_DEG = -20;
-const WATERMARK_ALPHA = 0.55;
+// El archivo watermark-mark.png ya trae su propia transparencia incorporada
+// (su canal alfa nunca llega a 100%, para que se vea sutil). WATERMARK_ALPHA
+// es un multiplicador ADICIONAL sobre esa transparencia — en 1 respeta el
+// contraste real del .png tal cual es; cualquier valor menor lo desvanece
+// todavía más y termina viéndose casi invisible sobre la foto.
+const WATERMARK_ALPHA = 1;
 let _watermarkImagePromise = null;
 function getWatermarkImage(){
   if (!_watermarkImagePromise) {
@@ -963,6 +968,30 @@ async function fetchFromBucket(bucket, path){
   return res.blob();
 }
 
+// La vista previa en vivo (al togglear la casilla) y el guardado final piden
+// la MISMA copia limpia de cada foto. Sin esta caché, cada click en la
+// casilla + el guardado terminan pidiéndola por red dos, tres o más veces
+// por foto — con varias fotos de galería y una conexión real a Supabase
+// (no local), esa duplicación es lo que hacía sentir el toggle lento.
+// Cacheamos por photoId para que la foto se traiga por red una sola vez.
+const _cleanSourceCache = new Map();
+function getCleanSourceBlob(photoId, fallbackUrl){
+  if (!_cleanSourceCache.has(photoId)) {
+    const promise = fetchFromBucket(ORIGINALS_BUCKET, `originals/${photoId}.jpg`)
+      .catch(async () => {
+        // Foto de antes de que existiera esta función: no hay copia limpia
+        // guardada. Como esas fotos nunca tuvieron marca de agua, se usa la
+        // imagen actual tal cual como si fuera la copia limpia.
+        const res = await fetch(fallbackUrl);
+        if (!res.ok) throw new Error('No se pudo descargar la foto actual.');
+        return res.blob();
+      })
+      .catch(err => { _cleanSourceCache.delete(photoId); throw err; });
+    _cleanSourceCache.set(photoId, promise);
+  }
+  return _cleanSourceCache.get(photoId);
+}
+
 // Punto único que decide qué hacer con UNA foto (principal o de galería) al
 // guardar el producto, según su estado y si la marca de agua cambió:
 //  - 'REMOVE'                         -> se quitó la foto
@@ -989,20 +1018,11 @@ async function processPhotoSlot(state, finalWatermarkEnabled, watermarkChanged){
   }
 
   // state.type === 'existing' && watermarkChanged: reprocesar desde la copia limpia,
-  // sin pedir la foto de nuevo.
+  // sin pedir la foto de nuevo. (Usa la misma caché que la vista previa, así
+  // que si el usuario ya togleó la casilla antes de guardar, esto no vuelve
+  // a pedir la foto por red.)
   const photoId = photoIdFromDisplayUrl(state.url);
-  let cleanSourceBlob;
-  try {
-    cleanSourceBlob = await fetchFromBucket(ORIGINALS_BUCKET, `originals/${photoId}.jpg`);
-  } catch (e) {
-    // Foto de antes de que existiera esta función: no hay copia limpia guardada.
-    // Como esas fotos nunca tuvieron marca de agua, se usa la imagen actual tal
-    // cual como si fuera la copia limpia, y de paso se guarda su copia limpia
-    // recién ahora para que los próximos cambios sean instantáneos.
-    const res = await fetch(state.url);
-    if (!res.ok) throw new Error('No se pudo descargar la foto actual.');
-    cleanSourceBlob = await res.blob();
-  }
+  const cleanSourceBlob = await getCleanSourceBlob(photoId, state.url);
   const img = await loadImageFromBlob(cleanSourceBlob);
   const { cleanBlob, watermarkedBlob } = await renderVariants(img, 640, 0.72, watermarkImg);
   await uploadToBucket(ORIGINALS_BUCKET, `originals/${photoId}.jpg`, cleanBlob);
@@ -1699,12 +1719,8 @@ async function renderMainPhotoPreview(){
       img = await loadImageFromFile(mainPhotoState.file);
     } else {
       const photoId = photoIdFromDisplayUrl(mainPhotoState.url);
-      try {
-        const blob = await fetchFromBucket(ORIGINALS_BUCKET, `originals/${photoId}.jpg`);
-        img = await loadImageFromBlob(blob);
-      } catch (e) {
-        img = await loadImageFromUrlPublic(mainPhotoState.url);
-      }
+      const blob = await getCleanSourceBlob(photoId, mainPhotoState.url);
+      img = await loadImageFromBlob(blob);
     }
     const watermarkImg = applyWatermark ? await getWatermarkImage() : null;
     const { cleanBlob, watermarkedBlob } = await renderVariants(img, 640, 0.72, watermarkImg);
@@ -1722,23 +1738,20 @@ async function renderGalleryRowPreview(idx){
     img = await loadImageFromFile(row.state.file);
   } else {
     const photoId = photoIdFromDisplayUrl(row.state.url);
-    try {
-      const blob = await fetchFromBucket(ORIGINALS_BUCKET, `originals/${photoId}.jpg`);
-      img = await loadImageFromBlob(blob);
-    } catch (e) {
-      img = await loadImageFromUrlPublic(row.state.url);
-    }
+    const blob = await getCleanSourceBlob(photoId, row.state.url);
+    img = await loadImageFromBlob(blob);
   }
   const watermarkImg = applyWatermark ? await getWatermarkImage() : null;
   const { cleanBlob, watermarkedBlob } = await renderVariants(img, 640, 0.72, watermarkImg);
   row.previewUrl = URL.createObjectURL(applyWatermark ? watermarkedBlob : cleanBlob);
 }
 async function renderAllGalleryPreviews(){
-  for (let i = 0; i < galleryRows.length; i++) {
-    if (galleryRows[i].state) {
-      try { await renderGalleryRowPreview(i); } catch (e) { /* deja la vista previa anterior */ }
-    }
-  }
+  // En paralelo: con varias fotos de galería, procesarlas una por una sumaba
+  // el tiempo de red de todas seguidas. En paralelo, el tiempo total es el de
+  // la más lenta, no la suma de todas.
+  await Promise.all(galleryRows.map((row, i) =>
+    row.state ? renderGalleryRowPreview(i).catch(() => { /* deja la vista previa anterior */ }) : null
+  ));
   renderGalleryList();
 }
 document.getElementById('pPhotoFile').addEventListener('change', e => {
@@ -1806,16 +1819,17 @@ document.getElementById('btnSaveProduct').addEventListener('click', async () => 
     const finalWatermarkEnabled = document.getElementById('pApplyWatermark').checked;
     const watermarkChanged = finalWatermarkEnabled !== initialWatermarkEnabled;
 
+    // La foto principal y cada foto de galería son independientes entre sí, así
+    // que se procesan todas EN PARALELO (no una por una) — con varias fotos,
+    // el tiempo total pasa a ser el de la más lenta, no la suma de todas.
     let photo_url;
-    const mainResult = await processPhotoSlot(mainPhotoState, finalWatermarkEnabled, watermarkChanged);
+    const rowsWithState = galleryRows.filter(r => r.state);
+    const [mainResult, ...galleryResults] = await Promise.all([
+      processPhotoSlot(mainPhotoState, finalWatermarkEnabled, watermarkChanged),
+      ...rowsWithState.map(r => processPhotoSlot(r.state, finalWatermarkEnabled, watermarkChanged)),
+    ]);
     if (mainResult.url !== undefined) photo_url = mainResult.url;
-
-    const gallery_photos = [];
-    for (const r of galleryRows) {
-      if (!r.state) continue;
-      const res = await processPhotoSlot(r.state, finalWatermarkEnabled, watermarkChanged);
-      if (res.url) gallery_photos.push(res.url);
-    }
+    const gallery_photos = galleryResults.filter(res => res.url).map(res => res.url);
 
     if (editingProductId == null) {
       const row = { name, category_id: cat, price, wholesale, sold, sort_order: products.length, description, specifications, wholesale_tiers, gallery_photos, watermark_enabled: finalWatermarkEnabled };

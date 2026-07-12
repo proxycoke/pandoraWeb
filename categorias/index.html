@@ -552,7 +552,7 @@ footer{background:#f4bad7;color:#424242;padding:44px 0 20px;margin-top:20px;}
     <button class="show-mobile menu-toggle-mobile" id="btnOpenCatMobile" aria-label="Abrir menú de categorías">
       <span aria-hidden="true">☰</span><span class="mt-label">Menú</span>
     </button>
-    <a href="../" id="logoHomeLink" class="logo" aria-label="Ir al inicio de Pandora Boutique">
+    <a href="/" id="logoHomeLink" class="logo" aria-label="Ir al inicio de Pandora Boutique">
       <img src="../assets/img/logo.png" width="400" height="235" alt="Pandora Boutique" class="header-logo-img">
     </a>
     <div class="search-wrap hide-mobile">
@@ -588,7 +588,7 @@ footer{background:#f4bad7;color:#424242;padding:44px 0 20px;margin-top:20px;}
   </div>
 
   <div id="viewDetail" style="display:none;">
-    <a href="./" id="backToGrid" class="back-link">← Todas las categorías</a>
+    <a href="/categorias/" id="backToGrid" class="back-link">← Todas las categorías</a>
     <div class="cat-page-header">
       <h1 class="cat-page-title" id="detailTitle">Categoría</h1>
       <div class="cat-page-sub" id="detailSub"></div>
@@ -631,9 +631,9 @@ footer{background:#f4bad7;color:#424242;padding:44px 0 20px;margin-top:20px;}
       <div>
         <h5>Enlaces</h5>
         <ul>
-          <li><a href="../">Inicio</a></li>
-          <li><a href="./">Categorías</a></li>
-          <li><a href="../opcionesdeenvio/">Opciones de envío</a></li>
+          <li><a href="/">Inicio</a></li>
+          <li><a href="/categorias/">Categorías</a></li>
+          <li><a href="/opcionesdeenvio/">Opciones de envío</a></li>
         </ul>
         <h5 style="margin-top:14px;">Aceptamos pagos en:</h5>
         <div class="payment-row">
@@ -653,7 +653,7 @@ footer{background:#f4bad7;color:#424242;padding:44px 0 20px;margin-top:20px;}
 
 <nav class="bottom-nav">
   <ul>
-    <li><a href="../" class="bn-item"><span class="icon">🏠</span>Inicio</a></li>
+    <li><a href="/" class="bn-item"><span class="icon">🏠</span>Inicio</a></li>
     <li><button class="bn-item active" id="btnOpenCatMobile2"><span class="icon">📋</span>Categorías</button></li>
     <li><button class="bn-item" id="btnFocusSearchMobile"><span class="icon">🔍</span>Buscar</button></li>
     <li><button class="bn-item" id="btnOpenCartMobile"><span class="icon">🛒</span>Carrito</button></li>
@@ -1015,7 +1015,7 @@ function renderDetail(slug) {
         <div class="nf-emoji">🔍</div>
         <h2>Oops! Esta categoría no existe.</h2>
         <p>Puede que el enlace esté mal escrito o ya no esté disponible.<br>
-        <a href="./" id="catNotFoundLink">Ver todas las categorías →</a></p>
+        <a href="/categorias/" id="catNotFoundLink">Ver todas las categorías →</a></p>
       </div>`;
     updateSeoMeta({
       title: "Categoría no encontrada | Pandora Boutique",
@@ -1113,7 +1113,7 @@ function renderProductDetail(catSlug, productParam) {
         <div class="nf-emoji">🔍</div>
         <h2>Oops! Este producto no existe.</h2>
         <p>Puede que el enlace esté mal escrito o ya no esté disponible.<br>
-        <a href="./" id="pdBackLink">Ver todas las categorías →</a></p>
+        <a href="/categorias/" id="pdBackLink">Ver todas las categorías →</a></p>
       </div>`;
     document.getElementById("pdBackLink").addEventListener("click", goToGridView);
     return;
@@ -1167,7 +1167,7 @@ function renderProductDetail(catSlug, productParam) {
 
   wrap.innerHTML = `
     <div class="breadcrumb">
-      <a href="../" id="pdHomeLink">Inicio</a> / <a href="./" id="pdGridLink">Categorías</a> / <a href="#" id="pdCatLink">${cat ? escapeHtml(cat.name) : "Categoría"}</a> / ${escapeHtml(p.name)}
+      <a href="/" id="pdHomeLink">Inicio</a> / <a href="/categorias/" id="pdGridLink">Categorías</a> / <a href="#" id="pdCatLink">${cat ? escapeHtml(cat.name) : "Categoría"}</a> / ${escapeHtml(p.name)}
     </div>
     <div class="product-main">
       <div class="gallery">
@@ -1204,7 +1204,7 @@ function renderProductDetail(catSlug, productParam) {
           </div>
           <div class="info-box">
             <div class="ib-icon">🚚</div>
-            <div><h5>Envío a nivel nacional</h5><p>Delivery en Lima o envío por courier a todo el Perú. Costo y tiempo se confirman antes de pagar. <a href="../opcionesdeenvio/">Ver opciones de envío →</a></p></div>
+            <div><h5>Envío a nivel nacional</h5><p>Delivery en Lima o envío por courier a todo el Perú. Costo y tiempo se confirman antes de pagar. <a href="/opcionesdeenvio/">Ver opciones de envío →</a></p></div>
           </div>
         </div>
       </div>
