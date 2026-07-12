@@ -393,7 +393,8 @@ footer{background:#f4bad7;color:#424242;padding:44px 0 20px;margin-top:20px;}
   .trust-grid{grid-template-columns:repeat(2,1fr);}
   .footer-grid{grid-template-columns:1fr;}
   .section{padding:26px 0;}
-  .wa-float{bottom:74px;}
+  .wa-float{bottom:74px;width:28px;height:28px;}
+  .wa-float svg{width:15px;height:15px;}
 }
 
 
@@ -994,6 +995,7 @@ function renderCatNav() {
 function renderGrid() {
   document.getElementById("viewGrid").style.display = "";
   document.getElementById("viewDetail").style.display = "none";
+  document.getElementById("viewProduct").style.display = "none";
   updateSeoMeta({
     title: "Categorías | Pandora Boutique",
     description: "Explora todas las categorías de Pandora Boutique: velas LED, luces, candelabros, estrellas decorativas y artículos de organización.",
@@ -1032,6 +1034,7 @@ function renderDetail(slug) {
   const cat = catById[slug];
   document.getElementById("viewGrid").style.display = "none";
   document.getElementById("viewDetail").style.display = "";
+  document.getElementById("viewProduct").style.display = "none";
 
   if (!cat) {
     document.getElementById("detailTitle").textContent = "";
