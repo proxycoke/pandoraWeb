@@ -191,6 +191,7 @@ button:disabled{opacity:.45;cursor:not-allowed;}
 .import-photos-option{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:10px 12px;}
 .import-photos-option-label{display:block;font-size:12px;font-weight:700;color:var(--black);margin-bottom:6px;}
 .import-photos-option input[type=file]{font-size:12.5px;max-width:100%;}
+.import-clear-btn{padding:6px 12px;font-size:12px;margin-top:8px;}
 .empty-msg{text-align:center;color:var(--gray);padding:40px 0;}
 .import-box{
   max-width:640px;margin:0 auto 24px;padding:20px 24px;background:#fff;border-radius:var(--radius);
@@ -323,6 +324,8 @@ button:disabled{opacity:.45;cursor:not-allowed;}
           <div class="field">
             <label>Archivo Excel (.xlsx)</label>
             <input type="file" id="importExcelFile" accept=".xlsx,.xls">
+            <br>
+            <button type="button" class="btn-outline import-clear-btn" id="btnClearExcel">✕ Quitar archivo</button>
           </div>
           <div class="field">
             <label>Fotos de estos productos (opcional, pero recomendado)</label>
@@ -336,6 +339,7 @@ button:disabled{opacity:.45;cursor:not-allowed;}
                 <input type="file" id="importPhotosFiles" accept="image/*" multiple>
               </div>
             </div>
+            <button type="button" class="btn-outline import-clear-btn" id="btnClearPhotos">✕ Quitar fotos seleccionadas</button>
             <p class="hint" id="importPhotosSelectedHint">Aún no se ha elegido ninguna foto.</p>
             <p class="hint">Usa la Opción A si tienes todas las fotos nuevas juntas en una sola carpeta, o la Opción B si prefieres elegirlas una por una (puedes seleccionar varias a la vez). El sistema busca cada foto por su nombre de archivo, tal como lo escribiste en el Excel.</p>
             <p class="hint">📐 Medida recomendada: fotos <strong>cuadradas</strong> (mismo ancho que alto), de al menos <strong>640 x 640 px</strong>. Si alguna foto no es cuadrada, se recorta automáticamente para llenar el espacio — para que se vea completa y nítida, usa fotos cuadradas con lo más importante centrado.</p>
@@ -897,8 +901,10 @@ async function loadAll(){
 }
 
 
+let suppressImportReset = false;
 document.querySelectorAll('.tab-btn').forEach(btn => {
   btn.addEventListener('click', () => {
+    const leavingImportTab = document.getElementById('tab-importacion').style.display === 'block' && btn.dataset.tab !== 'importacion';
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById('tab-productos').style.display = btn.dataset.tab === 'productos' ? 'block' : 'none';
@@ -907,6 +913,8 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     document.getElementById('tab-mantenimiento').style.display = btn.dataset.tab === 'mantenimiento' ? 'block' : 'none';
     document.getElementById('tab-importacion').style.display = btn.dataset.tab === 'importacion' ? 'block' : 'none';
     localStorage.setItem(ACTIVE_TAB_KEY, btn.dataset.tab);
+    if (leavingImportTab && !suppressImportReset) resetImportForm();
+    suppressImportReset = false;
   });
 });
 
@@ -1082,6 +1090,41 @@ document.getElementById('importPhotosFiles').addEventListener('change', (e) => {
   updateImportPhotosHint();
 });
 
+document.getElementById('btnClearExcel').addEventListener('click', () => {
+  document.getElementById('importExcelFile').value = '';
+  document.getElementById('importAnalyzeError').textContent = '';
+  importAnalyzedRows = [];
+  document.getElementById('importPreviewWrap').style.display = 'none';
+  document.getElementById('importResultWrap').style.display = 'none';
+});
+
+document.getElementById('btnClearPhotos').addEventListener('click', () => {
+  document.getElementById('importPhotosFolder').value = '';
+  document.getElementById('importPhotosFiles').value = '';
+  importPhotoFiles = {};
+  updateImportPhotosHint();
+});
+
+// Deja el formulario de importación masiva completamente en blanco, como recién
+// abierto — se usa al salir de esta pestaña para que la próxima vez que el
+// usuario entre aquí no vea restos de la última importación (archivo Excel ya
+// elegido, fotos ya elegidas, vista previa o resultado de la subida anterior).
+function resetImportForm(){
+  document.getElementById('importExcelFile').value = '';
+  document.getElementById('importPhotosFolder').value = '';
+  document.getElementById('importPhotosFiles').value = '';
+  importPhotoFiles = {};
+  importAnalyzedRows = [];
+  importedProductIds = [];
+  updateImportPhotosHint();
+  document.getElementById('importAnalyzeError').textContent = '';
+  document.getElementById('importPreviewWrap').style.display = 'none';
+  document.getElementById('importResultWrap').style.display = 'none';
+  document.getElementById('importProgressWrap').style.display = 'none';
+  document.getElementById('importPreviewBody').innerHTML = '';
+  document.getElementById('importSummary').textContent = '';
+}
+
 async function analyzeImportFile(){
   const errEl = document.getElementById('importAnalyzeError');
   errEl.textContent = '';
@@ -1252,6 +1295,11 @@ async function runImport(){
 document.getElementById('btnConfirmImport').addEventListener('click', runImport);
 
 document.getElementById('btnViewImported').addEventListener('click', () => {
+  // "Ver estos productos" cambia de pestaña como parte del MISMO flujo de
+  // importación (el usuario podría querer volver y usar "Deshacer esta
+  // importación") — no queremos que ese cambio de pestaña, por sí solo,
+  // borre el resultado que acaba de generarse.
+  suppressImportReset = true;
   importFilterIds = importedProductIds.slice();
   document.querySelector('.tab-btn[data-tab="productos"]').click();
   renderProducts();

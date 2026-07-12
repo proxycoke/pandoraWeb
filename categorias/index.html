@@ -278,8 +278,6 @@ footer{background:#f4bad7;color:#424242;padding:44px 0 20px;margin-top:20px;}
 .footer-grid h5{color:#e52d80;font-size:14px;margin-bottom:14px;font-weight:800;}
 .footer-grid p, .footer-grid li{font-size:13px;color:#424242;margin-bottom:9px;line-height:1.5;}
 .footer-grid li a:hover{color:#fff;}
-.contact-wa-line{display:flex;align-items:center;gap:6px;}
-.contact-wa-line .wa-icon-svg{display:inline-flex;flex-shrink:0;}
 .social-row{display:flex;gap:10px;margin-top:12px;}
 .social-row a{
   width:32px;height:32px;border-radius:50%;background:#2a2a2a;color:#ddd;display:flex;align-items:center;justify-content:center;font-size:14px;
@@ -300,7 +298,6 @@ footer{background:#f4bad7;color:#424242;padding:44px 0 20px;margin-top:20px;}
   background:#25D366;color:#fff;width:56px;height:56px;border-radius:50%;
   display:flex;align-items:center;justify-content:center;font-size:28px;box-shadow:var(--shadow-lg);
 }
-.wa-float svg{width:30px;height:30px;}
 
 
 .bottom-nav{
@@ -396,8 +393,7 @@ footer{background:#f4bad7;color:#424242;padding:44px 0 20px;margin-top:20px;}
   .trust-grid{grid-template-columns:repeat(2,1fr);}
   .footer-grid{grid-template-columns:1fr;}
   .section{padding:26px 0;}
-  .wa-float{bottom:74px;width:28px;height:28px;}
-  .wa-float svg{width:15px;height:15px;}
+  .wa-float{bottom:74px;}
 }
 
 
@@ -530,10 +526,31 @@ footer{background:#f4bad7;color:#424242;padding:44px 0 20px;margin-top:20px;}
 .maint-message{color:#fff;font-size:clamp(18px,2.6vw,26px);font-weight:800;max-width:640px;line-height:1.4;position:relative;}
 .maint-sub{color:rgba(255,255,255,.85);font-size:14px;margin-top:14px;font-weight:700;letter-spacing:.02em;position:relative;}
 
+.page-preloader{
+  position:fixed;inset:0;z-index:100000;
+  display:flex;align-items:center;justify-content:center;
+  background:#fff;
+  opacity:1;visibility:visible;
+  transition:opacity .35s ease,visibility 0s linear 0s;
+}
+.page-preloader.hide{
+  opacity:0;visibility:hidden;pointer-events:none;
+  transition:opacity .35s ease,visibility 0s linear .35s;
+}
+.page-preloader img{width:min(200px,45vw);height:auto;animation:preloaderPulse 1.3s ease-in-out infinite;}
+@keyframes preloaderPulse{
+  0%,100%{transform:scale(1);opacity:1;}
+  50%{transform:scale(1.08);opacity:.75;}
+}
+
 </style>
 </head>
 <body>
 
+
+<div id="pagePreloader" class="page-preloader">
+  <img src="../assets/img/logo.png" alt="Pandora Boutique" width="200" height="118">
+</div>
 
 <div id="maintenanceScreen" class="maintenance-screen">
   <div class="maint-decor maint-decor-1"></div>
@@ -556,7 +573,7 @@ footer{background:#f4bad7;color:#424242;padding:44px 0 20px;margin-top:20px;}
     <button class="show-mobile menu-toggle-mobile" id="btnOpenCatMobile" aria-label="Abrir menú de categorías">
       <span aria-hidden="true">☰</span><span class="mt-label">Menú</span>
     </button>
-    <a href="/" id="logoHomeLink" class="logo" aria-label="Ir al inicio de Pandora Boutique">
+    <a href="../" id="logoHomeLink" class="logo" aria-label="Ir al inicio de Pandora Boutique">
       <img src="../assets/img/logo.png" width="400" height="235" alt="Pandora Boutique" class="header-logo-img">
     </a>
     <div class="search-wrap hide-mobile">
@@ -592,7 +609,7 @@ footer{background:#f4bad7;color:#424242;padding:44px 0 20px;margin-top:20px;}
   </div>
 
   <div id="viewDetail" style="display:none;">
-    <a href="/categorias/" id="backToGrid" class="back-link">← Todas las categorías</a>
+    <a href="./" id="backToGrid" class="back-link">← Todas las categorías</a>
     <div class="cat-page-header">
       <h1 class="cat-page-title" id="detailTitle">Categoría</h1>
       <div class="cat-page-sub" id="detailSub"></div>
@@ -629,15 +646,15 @@ footer{background:#f4bad7;color:#424242;padding:44px 0 20px;margin-top:20px;}
       <div>
         <h5>Contacto</h5>
         <p>📷 Instagram: @pandoraboutique</p>
-        <p class="contact-wa-line"><span class="wa-icon-svg" aria-hidden="true"><svg viewBox="0 0 32 32" width="16" height="16"><path fill="#25D366" d="M16.04 3C9.37 3 3.96 8.41 3.96 15.08c0 2.23.6 4.32 1.65 6.12L4 29l7.99-1.57a12.06 12.06 0 0 0 4.05.7c6.67 0 12.08-5.41 12.08-12.08S22.71 3 16.04 3z"/><path fill="#fff" d="M23.06 19.03c-.3-.15-1.78-.88-2.06-.98-.28-.1-.48-.15-.68.15-.2.3-.78.98-.96 1.18-.18.2-.35.22-.65.08-.3-.15-1.28-.47-2.44-1.5-.9-.8-1.51-1.79-1.69-2.09-.18-.3-.02-.46.13-.61.14-.14.3-.35.45-.53.15-.18.2-.3.3-.5.1-.2.05-.38-.02-.53-.08-.15-.68-1.64-.93-2.24-.24-.58-.49-.5-.68-.51h-.58c-.2 0-.53.08-.8.38-.28.3-1.05 1.03-1.05 2.5 0 1.48 1.08 2.9 1.23 3.1.15.2 2.12 3.24 5.14 4.54.72.31 1.28.5 1.72.64.72.23 1.38.2 1.9.12.58-.09 1.78-.73 2.03-1.43.25-.7.25-1.3.18-1.43-.07-.13-.27-.2-.57-.35z"/></svg></span> WhatsApp: +51 981 004 005</p>
+        <p>📞 WhatsApp: +51 981 004 005</p>
         <p>🕒 Lun-Sáb horario de atención</p>
       </div>
       <div>
         <h5>Enlaces</h5>
         <ul>
-          <li><a href="/">Inicio</a></li>
-          <li><a href="/categorias/">Categorías</a></li>
-          <li><a href="/opcionesdeenvio/">Opciones de envío</a></li>
+          <li><a href="../">Inicio</a></li>
+          <li><a href="./">Categorías</a></li>
+          <li><a href="../opcionesdeenvio/">Opciones de envío</a></li>
         </ul>
         <h5 style="margin-top:14px;">Aceptamos pagos en:</h5>
         <div class="payment-row">
@@ -657,7 +674,7 @@ footer{background:#f4bad7;color:#424242;padding:44px 0 20px;margin-top:20px;}
 
 <nav class="bottom-nav">
   <ul>
-    <li><a href="/" class="bn-item"><span class="icon">🏠</span>Inicio</a></li>
+    <li><a href="../" class="bn-item"><span class="icon">🏠</span>Inicio</a></li>
     <li><button class="bn-item active" id="btnOpenCatMobile2"><span class="icon">📋</span>Categorías</button></li>
     <li><button class="bn-item" id="btnFocusSearchMobile"><span class="icon">🔍</span>Buscar</button></li>
     <li><button class="bn-item" id="btnOpenCartMobile"><span class="icon">🛒</span>Carrito</button></li>
@@ -784,6 +801,11 @@ async function loadCatalog() {
   }));
 }
 
+
+function hidePagePreloader() {
+  const el = document.getElementById("pagePreloader");
+  if (el) el.classList.add("hide");
+}
 
 async function checkMaintenanceMode() {
   try {
@@ -972,7 +994,6 @@ function renderCatNav() {
 function renderGrid() {
   document.getElementById("viewGrid").style.display = "";
   document.getElementById("viewDetail").style.display = "none";
-  document.getElementById("viewProduct").style.display = "none";
   updateSeoMeta({
     title: "Categorías | Pandora Boutique",
     description: "Explora todas las categorías de Pandora Boutique: velas LED, luces, candelabros, estrellas decorativas y artículos de organización.",
@@ -1011,7 +1032,6 @@ function renderDetail(slug) {
   const cat = catById[slug];
   document.getElementById("viewGrid").style.display = "none";
   document.getElementById("viewDetail").style.display = "";
-  document.getElementById("viewProduct").style.display = "none";
 
   if (!cat) {
     document.getElementById("detailTitle").textContent = "";
@@ -1021,7 +1041,7 @@ function renderDetail(slug) {
         <div class="nf-emoji">🔍</div>
         <h2>Oops! Esta categoría no existe.</h2>
         <p>Puede que el enlace esté mal escrito o ya no esté disponible.<br>
-        <a href="/categorias/" id="catNotFoundLink">Ver todas las categorías →</a></p>
+        <a href="./" id="catNotFoundLink">Ver todas las categorías →</a></p>
       </div>`;
     updateSeoMeta({
       title: "Categoría no encontrada | Pandora Boutique",
@@ -1119,7 +1139,7 @@ function renderProductDetail(catSlug, productParam) {
         <div class="nf-emoji">🔍</div>
         <h2>Oops! Este producto no existe.</h2>
         <p>Puede que el enlace esté mal escrito o ya no esté disponible.<br>
-        <a href="/categorias/" id="pdBackLink">Ver todas las categorías →</a></p>
+        <a href="./" id="pdBackLink">Ver todas las categorías →</a></p>
       </div>`;
     document.getElementById("pdBackLink").addEventListener("click", goToGridView);
     return;
@@ -1173,7 +1193,7 @@ function renderProductDetail(catSlug, productParam) {
 
   wrap.innerHTML = `
     <div class="breadcrumb">
-      <a href="/" id="pdHomeLink">Inicio</a> / <a href="/categorias/" id="pdGridLink">Categorías</a> / <a href="#" id="pdCatLink">${cat ? escapeHtml(cat.name) : "Categoría"}</a> / ${escapeHtml(p.name)}
+      <a href="../" id="pdHomeLink">Inicio</a> / <a href="./" id="pdGridLink">Categorías</a> / <a href="#" id="pdCatLink">${cat ? escapeHtml(cat.name) : "Categoría"}</a> / ${escapeHtml(p.name)}
     </div>
     <div class="product-main">
       <div class="gallery">
@@ -1210,7 +1230,7 @@ function renderProductDetail(catSlug, productParam) {
           </div>
           <div class="info-box">
             <div class="ib-icon">🚚</div>
-            <div><h5>Envío a nivel nacional</h5><p>Delivery en Lima o envío por courier a todo el Perú. Costo y tiempo se confirman antes de pagar. <a href="/opcionesdeenvio/">Ver opciones de envío →</a></p></div>
+            <div><h5>Envío a nivel nacional</h5><p>Delivery en Lima o envío por courier a todo el Perú. Costo y tiempo se confirman antes de pagar. <a href="../opcionesdeenvio/">Ver opciones de envío →</a></p></div>
           </div>
         </div>
       </div>
@@ -1390,6 +1410,7 @@ function closeMobileCatPanel() {
 
 
 document.addEventListener("DOMContentLoaded", async () => {
+ try {
   const enMantenimiento = await checkMaintenanceMode();
   if (enMantenimiento) return;
 
@@ -1460,7 +1481,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   
   document.getElementById("overlay").addEventListener("click", () => { closeCart(); closeMobileCatPanel(); });
 
-  
+
+ } finally {
+   hidePagePreloader();
+ }
 });
 
 </script>
